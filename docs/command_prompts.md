@@ -47,6 +47,10 @@ Many of the TokenType enumerations have descriptive names like TokenType::AND an
 
 Please generate tests/lexer_test.rs to comprehensively test the tokenization implemented in lexer.rs.  Please generate common usage cases and edge cases.  Generate positive and negative test cases. Compile and run the new tests.  Do not ignore any failed test cases and do not leave TODOs in the code.
 
+## Pre-Evaluator Task 3
+
+Please generate tests/parser_test.rs to comprehensively test the parsing implemented in parser.rs.  Please generate common usage cases and edge cases for each logical, relational, comparison and arithmetic operation.  Generate positive and negative test cases. Compile and run the new tests.  Do not ignore any failed test cases and do not leave TODOs in the code.
+
 
 # SQL Boolean Expression Evaluation - Plan
 

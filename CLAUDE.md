@@ -54,4 +54,5 @@ let arena = parser.arena();
 - `UnaryExprNode` stores `operator: Option<UnaryOp>` (Plus, Negate, Not) for prefix unary operators.
 - `pretty_print()` displays operators in `[...]` after the node name (e.g., `ComparisonExpression [>]`, `UnaryExpr [NOT]`). Nodes with operators are never elided as pass-through.
 - The `tests/main_test` file references a different parser crate (`arithmetic`) and is not part of this project's test suite.
+- **`tests/lexer_test.rs`** - 86 lexer tests covering all token types, keyword case-insensitivity, operator disambiguation, offset tracking, identifiers, numeric/string/boolean literals, whitespace handling, and error cases (unexpected characters, unterminated strings).
 - **`tests/pretty_parse_test.rs`** - 10 integration tests validating pretty-print output. Each test uses two logical operators and at least two comparison operators. Covers all expression types and all operator variants.
