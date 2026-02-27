@@ -79,19 +79,19 @@ impl Lexer {
         let ch = self.current_char();
 
         if self.matches_string("<>") {
-            return Ok(Some(self.consume_literal(TokenType::Token18, "<>", start_pos)));
+            return Ok(Some(self.consume_literal(TokenType::NE, "<>", start_pos)));
         }
         if self.matches_string(">=") {
-            return Ok(Some(self.consume_literal(TokenType::Token20, ">=", start_pos)));
+            return Ok(Some(self.consume_literal(TokenType::GE, ">=", start_pos)));
         }
         if self.matches_string("<=") {
-            return Ok(Some(self.consume_literal(TokenType::Token22, "<=", start_pos)));
+            return Ok(Some(self.consume_literal(TokenType::LE, "<=", start_pos)));
         }
         match ch {
             ' ' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token1,
+                    TokenType::SPACE,
                     " ".to_string(),
                     start_pos,
                     self.position,
@@ -100,7 +100,7 @@ impl Lexer {
             '\t' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token2,
+                    TokenType::TAB,
                     "\t".to_string(),
                     start_pos,
                     self.position,
@@ -109,7 +109,7 @@ impl Lexer {
             '\n' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token3,
+                    TokenType::NEWLINE,
                     "\n".to_string(),
                     start_pos,
                     self.position,
@@ -118,7 +118,7 @@ impl Lexer {
             '\r' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token4,
+                    TokenType::CR,
                     "\r".to_string(),
                     start_pos,
                     self.position,
@@ -127,7 +127,7 @@ impl Lexer {
             '\x0c' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token5,
+                    TokenType::FORM_FEED,
                     "\x0c".to_string(),
                     start_pos,
                     self.position,
@@ -136,7 +136,7 @@ impl Lexer {
             '=' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token17,
+                    TokenType::EQ,
                     "=".to_string(),
                     start_pos,
                     self.position,
@@ -145,7 +145,7 @@ impl Lexer {
             '>' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token19,
+                    TokenType::GT,
                     ">".to_string(),
                     start_pos,
                     self.position,
@@ -154,7 +154,7 @@ impl Lexer {
             '<' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token21,
+                    TokenType::LT,
                     "<".to_string(),
                     start_pos,
                     self.position,
@@ -163,7 +163,7 @@ impl Lexer {
             '(' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token23,
+                    TokenType::LPAREN,
                     "(".to_string(),
                     start_pos,
                     self.position,
@@ -172,7 +172,7 @@ impl Lexer {
             ',' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token24,
+                    TokenType::COMMA,
                     ",".to_string(),
                     start_pos,
                     self.position,
@@ -181,7 +181,7 @@ impl Lexer {
             ')' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token25,
+                    TokenType::RPAREN,
                     ")".to_string(),
                     start_pos,
                     self.position,
@@ -190,7 +190,7 @@ impl Lexer {
             '+' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token26,
+                    TokenType::PLUS,
                     "+".to_string(),
                     start_pos,
                     self.position,
@@ -199,7 +199,7 @@ impl Lexer {
             '-' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token27,
+                    TokenType::MINUS,
                     "-".to_string(),
                     start_pos,
                     self.position,
@@ -208,7 +208,7 @@ impl Lexer {
             '*' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token28,
+                    TokenType::STAR,
                     "*".to_string(),
                     start_pos,
                     self.position,
@@ -217,7 +217,7 @@ impl Lexer {
             '/' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token29,
+                    TokenType::SLASH,
                     "/".to_string(),
                     start_pos,
                     self.position,
@@ -226,7 +226,7 @@ impl Lexer {
             '%' => {
                 self.advance();
                 return Ok(Some(Token::new(
-                    TokenType::Token30,
+                    TokenType::PERCENT,
                     "%".to_string(),
                     start_pos,
                     self.position,

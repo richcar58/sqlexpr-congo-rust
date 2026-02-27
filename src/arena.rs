@@ -196,8 +196,8 @@ impl Arena {
                 if !node.operators.is_empty() {
                     let ops: Vec<&str> = node.operators.iter()
                         .map(|op| match op {
-                            AddOp::Token26 => "+",
-                            AddOp::Token27 => "-",
+                            AddOp::Plus => "+",
+                            AddOp::Minus => "-",
                         })
                         .collect();
                     result.push_str(&format!("{}AddExpression [{}]\n", indent_str, ops.join(", ")));
@@ -212,9 +212,9 @@ impl Arena {
                 if !node.operators.is_empty() {
                     let ops: Vec<&str> = node.operators.iter()
                         .map(|op| match op {
-                            MultExprOp::Token28 => "*",
-                            MultExprOp::Token29 => "/",
-                            MultExprOp::Token30 => "%",
+                            MultExprOp::Star => "*",
+                            MultExprOp::Slash => "/",
+                            MultExprOp::Percent => "%",
                         })
                         .collect();
                     result.push_str(&format!("{}MultExpr [{}]\n", indent_str, ops.join(", ")));
@@ -332,9 +332,9 @@ pub enum AstNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AddOp {
     /// +
-    Token26,
+    Plus,
     /// -
-    Token27,
+    Minus,
 }
 
 /// Operator for multExpr
@@ -342,11 +342,11 @@ pub enum AddOp {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MultExprOp {
     /// *
-    Token28,
+    Star,
     /// /
-    Token29,
+    Slash,
     /// %
-    Token30,
+    Percent,
 }
 
 /// Operator for equalityExpression

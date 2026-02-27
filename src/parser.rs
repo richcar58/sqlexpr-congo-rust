@@ -152,19 +152,19 @@ impl Parser {
             children.push(child);
         }
         loop {
-        if self.current_token.token_type == TokenType::Token17
+        if self.current_token.token_type == TokenType::EQ
         {
         operators.push(EqualityOp::Equal);
-        self.expect_token(TokenType::Token17)?;
+        self.expect_token(TokenType::EQ)?;
         {
             let child = self.parse_comparison_expression()?;
             children.push(child);
         }
         }
-        else if self.current_token.token_type == TokenType::Token18
+        else if self.current_token.token_type == TokenType::NE
         {
         operators.push(EqualityOp::NotEqual);
-        self.expect_token(TokenType::Token18)?;
+        self.expect_token(TokenType::NE)?;
         {
             let child = self.parse_comparison_expression()?;
             children.push(child);
@@ -212,37 +212,37 @@ impl Parser {
             children.push(child);
         }
         loop {
-        if self.current_token.token_type == TokenType::Token19
+        if self.current_token.token_type == TokenType::GT
         {
         operators.push(ComparisonOp::GreaterThan);
-        self.expect_token(TokenType::Token19)?;
+        self.expect_token(TokenType::GT)?;
         {
             let child = self.parse_add_expression()?;
             children.push(child);
         }
         }
-        else if self.current_token.token_type == TokenType::Token20
+        else if self.current_token.token_type == TokenType::GE
         {
         operators.push(ComparisonOp::GreaterThanEqual);
-        self.expect_token(TokenType::Token20)?;
+        self.expect_token(TokenType::GE)?;
         {
             let child = self.parse_add_expression()?;
             children.push(child);
         }
         }
-        else if self.current_token.token_type == TokenType::Token21
+        else if self.current_token.token_type == TokenType::LT
         {
         operators.push(ComparisonOp::LessThan);
-        self.expect_token(TokenType::Token21)?;
+        self.expect_token(TokenType::LT)?;
         {
             let child = self.parse_add_expression()?;
             children.push(child);
         }
         }
-        else if self.current_token.token_type == TokenType::Token22
+        else if self.current_token.token_type == TokenType::LE
         {
         operators.push(ComparisonOp::LessThanEqual);
-        self.expect_token(TokenType::Token22)?;
+        self.expect_token(TokenType::LE)?;
         {
             let child = self.parse_add_expression()?;
             children.push(child);
@@ -320,43 +320,43 @@ impl Parser {
         {
         operators.push(ComparisonOp::In);
         self.expect_token(TokenType::IN)?;
-        self.expect_token(TokenType::Token23)?;
+        self.expect_token(TokenType::LPAREN)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
-        while self.current_token.token_type == TokenType::Token24
+        while self.current_token.token_type == TokenType::COMMA
         {
-        self.expect_token(TokenType::Token24)?;
+        self.expect_token(TokenType::COMMA)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
         }
-        self.expect_token(TokenType::Token25)?;
+        self.expect_token(TokenType::RPAREN)?;
         }
         else if
             self.current_token.token_type == TokenType::NOT
             && self.lookahead_type(1) == Some(TokenType::IN)
-            && self.lookahead_type(2) == Some(TokenType::Token23)
+            && self.lookahead_type(2) == Some(TokenType::LPAREN)
         {
         operators.push(ComparisonOp::NotIn);
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::IN)?;
-        self.expect_token(TokenType::Token23)?;
+        self.expect_token(TokenType::LPAREN)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
-        while self.current_token.token_type == TokenType::Token24
+        while self.current_token.token_type == TokenType::COMMA
         {
-        self.expect_token(TokenType::Token24)?;
+        self.expect_token(TokenType::COMMA)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
         }
-        self.expect_token(TokenType::Token25)?;
+        self.expect_token(TokenType::RPAREN)?;
         }
         else {
             break;
@@ -383,12 +383,12 @@ impl Parser {
         let first = self.parse_mult_expr()?;
         children.push(first);
 
-        while self.current_token.token_type == TokenType::Token26
-            || self.current_token.token_type == TokenType::Token27
+        while self.current_token.token_type == TokenType::PLUS
+            || self.current_token.token_type == TokenType::MINUS
         {
             let op = match self.current_token.token_type {
-                TokenType::Token26 => AddOp::Token26,
-                TokenType::Token27 => AddOp::Token27,
+                TokenType::PLUS => AddOp::Plus,
+                TokenType::MINUS => AddOp::Minus,
                 _ => unreachable!(),
             };
             operators.push(op);
@@ -419,14 +419,14 @@ impl Parser {
         let first = self.parse_unary_expr()?;
         children.push(first);
 
-        while self.current_token.token_type == TokenType::Token28
-            || self.current_token.token_type == TokenType::Token29
-            || self.current_token.token_type == TokenType::Token30
+        while self.current_token.token_type == TokenType::STAR
+            || self.current_token.token_type == TokenType::SLASH
+            || self.current_token.token_type == TokenType::PERCENT
         {
             let op = match self.current_token.token_type {
-                TokenType::Token28 => MultExprOp::Token28,
-                TokenType::Token29 => MultExprOp::Token29,
-                TokenType::Token30 => MultExprOp::Token30,
+                TokenType::STAR => MultExprOp::Star,
+                TokenType::SLASH => MultExprOp::Slash,
+                TokenType::PERCENT => MultExprOp::Percent,
                 _ => unreachable!(),
             };
             operators.push(op);
@@ -455,19 +455,19 @@ impl Parser {
         let mut operator: Option<UnaryOp> = None;
 
         if
-            self.current_token.token_type == TokenType::Token26
+            self.current_token.token_type == TokenType::PLUS
         {
         operator = Some(UnaryOp::Plus);
-        self.expect_token(TokenType::Token26)?;
+        self.expect_token(TokenType::PLUS)?;
         {
             let child = self.parse_unary_expr()?;
             children.push(child);
         }
         }
-        else if self.current_token.token_type == TokenType::Token27
+        else if self.current_token.token_type == TokenType::MINUS
         {
         operator = Some(UnaryOp::Negate);
-        self.expect_token(TokenType::Token27)?;
+        self.expect_token(TokenType::MINUS)?;
         {
             let child = self.parse_unary_expr()?;
             children.push(child);
@@ -485,7 +485,7 @@ impl Parser {
         else if self.current_token.token_type == TokenType::TRUE
             || self.current_token.token_type == TokenType::FALSE
             || self.current_token.token_type == TokenType::NULL
-            || self.current_token.token_type == TokenType::Token23
+            || self.current_token.token_type == TokenType::LPAREN
             || self.current_token.token_type == TokenType::DECIMAL_LITERAL
             || self.current_token.token_type == TokenType::HEX_LITERAL
             || self.current_token.token_type == TokenType::OCTAL_LITERAL
@@ -541,11 +541,11 @@ impl Parser {
             let inner = self.parse_variable()?;
             children.push(inner);
         }
-        else if self.current_token.token_type == TokenType::Token23 {
+        else if self.current_token.token_type == TokenType::LPAREN {
             self.consume_token()?;
             let inner = self.parse_or_expression()?;
             children.push(inner);
-            self.expect_token(TokenType::Token25)?;
+            self.expect_token(TokenType::RPAREN)?;
         }
         else {
             return Err(ParseError::at_position(

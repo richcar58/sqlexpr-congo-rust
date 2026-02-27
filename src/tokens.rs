@@ -9,84 +9,84 @@ use std::fmt;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(non_camel_case_types)]
 pub enum TokenType {
-    /// Token: EOF
-        EOF,
-    /// Token: _TOKEN_1
-        Token1,
-    /// Token: _TOKEN_2
-        Token2,
-    /// Token: _TOKEN_3
-        Token3,
-    /// Token: _TOKEN_4
-        Token4,
-    /// Token: _TOKEN_5
-        Token5,
-    /// Token: NOT
-        NOT,
-    /// Token: AND
-        AND,
-    /// Token: OR
-        OR,
-    /// Token: BETWEEN
-        BETWEEN,
-    /// Token: LIKE
-        LIKE,
-    /// Token: ESCAPE
-        ESCAPE,
-    /// Token: IN
-        IN,
-    /// Token: IS
-        IS,
-    /// Token: TRUE
-        TRUE,
-    /// Token: FALSE
-        FALSE,
-    /// Token: NULL
-        NULL,
-    /// Token: _TOKEN_17
-        Token17,
-    /// Token: _TOKEN_18
-        Token18,
-    /// Token: _TOKEN_19
-        Token19,
-    /// Token: _TOKEN_20
-        Token20,
-    /// Token: _TOKEN_21
-        Token21,
-    /// Token: _TOKEN_22
-        Token22,
-    /// Token: _TOKEN_23
-        Token23,
-    /// Token: _TOKEN_24
-        Token24,
-    /// Token: _TOKEN_25
-        Token25,
-    /// Token: _TOKEN_26
-        Token26,
-    /// Token: _TOKEN_27
-        Token27,
-    /// Token: _TOKEN_28
-        Token28,
-    /// Token: _TOKEN_29
-        Token29,
-    /// Token: _TOKEN_30
-        Token30,
-    /// Token: LINE_COMMENT
-        LINE_COMMENT,
-    /// Token: BLOCK_COMMENT
-        BLOCK_COMMENT,
-    /// Token: DECIMAL_LITERAL
-        DECIMAL_LITERAL,
-    /// Token: HEX_LITERAL
-        HEX_LITERAL,
-    /// Token: OCTAL_LITERAL
-        OCTAL_LITERAL,
-    /// Token: FLOATING_POINT_LITERAL
-        FLOATING_POINT_LITERAL,
-    /// Token: STRING_LITERAL
-        STRING_LITERAL,
-    /// Token: ID
-        ID,
+    /// End of file
+    EOF,
+    /// Whitespace: space
+    SPACE,
+    /// Whitespace: tab
+    TAB,
+    /// Whitespace: newline
+    NEWLINE,
+    /// Whitespace: carriage return
+    CR,
+    /// Whitespace: form feed
+    FORM_FEED,
+    /// Keyword: NOT
+    NOT,
+    /// Keyword: AND
+    AND,
+    /// Keyword: OR
+    OR,
+    /// Keyword: BETWEEN
+    BETWEEN,
+    /// Keyword: LIKE
+    LIKE,
+    /// Keyword: ESCAPE
+    ESCAPE,
+    /// Keyword: IN
+    IN,
+    /// Keyword: IS
+    IS,
+    /// Keyword: TRUE
+    TRUE,
+    /// Keyword: FALSE
+    FALSE,
+    /// Keyword: NULL
+    NULL,
+    /// Operator: = (equals)
+    EQ,
+    /// Operator: <> (not equals)
+    NE,
+    /// Operator: > (greater than)
+    GT,
+    /// Operator: >= (greater than or equal)
+    GE,
+    /// Operator: < (less than)
+    LT,
+    /// Operator: <= (less than or equal)
+    LE,
+    /// Delimiter: ( (left parenthesis)
+    LPAREN,
+    /// Delimiter: , (comma)
+    COMMA,
+    /// Delimiter: ) (right parenthesis)
+    RPAREN,
+    /// Operator: + (plus)
+    PLUS,
+    /// Operator: - (minus)
+    MINUS,
+    /// Operator: * (multiply)
+    STAR,
+    /// Operator: / (divide)
+    SLASH,
+    /// Operator: % (modulo)
+    PERCENT,
+    /// Line comment
+    LINE_COMMENT,
+    /// Block comment
+    BLOCK_COMMENT,
+    /// Decimal numeric literal
+    DECIMAL_LITERAL,
+    /// Hexadecimal numeric literal
+    HEX_LITERAL,
+    /// Octal numeric literal
+    OCTAL_LITERAL,
+    /// Floating point numeric literal
+    FLOATING_POINT_LITERAL,
+    /// String literal (single-quoted)
+    STRING_LITERAL,
+    /// Identifier
+    ID,
     /// Invalid token marker
     INVALID,
 }
@@ -95,11 +95,11 @@ impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TokenType::EOF => write!(f, "EOF"),
-            TokenType::Token1 => write!(f, "_TOKEN_1"),
-            TokenType::Token2 => write!(f, "_TOKEN_2"),
-            TokenType::Token3 => write!(f, "_TOKEN_3"),
-            TokenType::Token4 => write!(f, "_TOKEN_4"),
-            TokenType::Token5 => write!(f, "_TOKEN_5"),
+            TokenType::SPACE => write!(f, "SPACE"),
+            TokenType::TAB => write!(f, "TAB"),
+            TokenType::NEWLINE => write!(f, "NEWLINE"),
+            TokenType::CR => write!(f, "CR"),
+            TokenType::FORM_FEED => write!(f, "FORM_FEED"),
             TokenType::NOT => write!(f, "NOT"),
             TokenType::AND => write!(f, "AND"),
             TokenType::OR => write!(f, "OR"),
@@ -111,20 +111,20 @@ impl fmt::Display for TokenType {
             TokenType::TRUE => write!(f, "TRUE"),
             TokenType::FALSE => write!(f, "FALSE"),
             TokenType::NULL => write!(f, "NULL"),
-            TokenType::Token17 => write!(f, "_TOKEN_17"),
-            TokenType::Token18 => write!(f, "_TOKEN_18"),
-            TokenType::Token19 => write!(f, "_TOKEN_19"),
-            TokenType::Token20 => write!(f, "_TOKEN_20"),
-            TokenType::Token21 => write!(f, "_TOKEN_21"),
-            TokenType::Token22 => write!(f, "_TOKEN_22"),
-            TokenType::Token23 => write!(f, "_TOKEN_23"),
-            TokenType::Token24 => write!(f, "_TOKEN_24"),
-            TokenType::Token25 => write!(f, "_TOKEN_25"),
-            TokenType::Token26 => write!(f, "_TOKEN_26"),
-            TokenType::Token27 => write!(f, "_TOKEN_27"),
-            TokenType::Token28 => write!(f, "_TOKEN_28"),
-            TokenType::Token29 => write!(f, "_TOKEN_29"),
-            TokenType::Token30 => write!(f, "_TOKEN_30"),
+            TokenType::EQ => write!(f, "="),
+            TokenType::NE => write!(f, "<>"),
+            TokenType::GT => write!(f, ">"),
+            TokenType::GE => write!(f, ">="),
+            TokenType::LT => write!(f, "<"),
+            TokenType::LE => write!(f, "<="),
+            TokenType::LPAREN => write!(f, "("),
+            TokenType::COMMA => write!(f, ","),
+            TokenType::RPAREN => write!(f, ")"),
+            TokenType::PLUS => write!(f, "+"),
+            TokenType::MINUS => write!(f, "-"),
+            TokenType::STAR => write!(f, "*"),
+            TokenType::SLASH => write!(f, "/"),
+            TokenType::PERCENT => write!(f, "%"),
             TokenType::LINE_COMMENT => write!(f, "LINE_COMMENT"),
             TokenType::BLOCK_COMMENT => write!(f, "BLOCK_COMMENT"),
             TokenType::DECIMAL_LITERAL => write!(f, "DECIMAL_LITERAL"),
