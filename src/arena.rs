@@ -72,11 +72,11 @@ impl Arena {
             AstNode::JmsSelector(n) => n.children.len() == 1,
             AstNode::OrExpression(n) => n.children.len() == 1,
             AstNode::AndExpression(n) => n.children.len() == 1,
-            AstNode::EqualityExpression(n) => n.children.len() == 1,
-            AstNode::ComparisonExpression(n) => n.children.len() == 1,
+            AstNode::EqualityExpression(n) => n.children.len() == 1 && n.operators.is_empty(),
+            AstNode::ComparisonExpression(n) => n.children.len() == 1 && n.operators.is_empty(),
             AstNode::AddExpression(n) => n.children.len() == 1 && n.operators.is_empty(),
             AstNode::MultExpr(n) => n.children.len() == 1 && n.operators.is_empty(),
-            AstNode::UnaryExpr(n) => n.children.len() == 1,
+            AstNode::UnaryExpr(n) => n.children.len() == 1 && n.operator.is_none(),
             AstNode::PrimaryExpr(_) => false,
             AstNode::Literal(_) => false,
             AstNode::StringLitteral(n) => n.children.len() == 1,
@@ -145,25 +145,51 @@ impl Arena {
                 }
             }
             AstNode::EqualityExpression(node) => {
-                if node.children.is_empty() {
+                if !node.operators.is_empty() {
+                    let ops: Vec<&str> = node.operators.iter()
+                        .map(|op| match op {
+                            EqualityOp::Equal => "=",
+                            EqualityOp::NotEqual => "<>",
+                            EqualityOp::IsNull => "IS NULL",
+                            EqualityOp::IsNotNull => "IS NOT NULL",
+                        })
+                        .collect();
+                    result.push_str(&format!("{}EqualityExpression [{}]\n", indent_str, ops.join(", ")));
+                } else if node.children.is_empty() {
                     let value = &self.get_token(node.begin_token).image;
                     result.push_str(&format!("{}EqualityExpression(\"{}\")\n", indent_str, value));
                 } else {
                     result.push_str(&format!("{}EqualityExpression\n", indent_str));
-                    for child in &node.children {
-                        self.pretty_print_impl(*child, indent + 1, result);
-                    }
+                }
+                for child in &node.children {
+                    self.pretty_print_impl(*child, indent + 1, result);
                 }
             }
             AstNode::ComparisonExpression(node) => {
-                if node.children.is_empty() {
+                if !node.operators.is_empty() {
+                    let ops: Vec<&str> = node.operators.iter()
+                        .map(|op| match op {
+                            ComparisonOp::GreaterThan => ">",
+                            ComparisonOp::GreaterThanEqual => ">=",
+                            ComparisonOp::LessThan => "<",
+                            ComparisonOp::LessThanEqual => "<=",
+                            ComparisonOp::Like => "LIKE",
+                            ComparisonOp::NotLike => "NOT LIKE",
+                            ComparisonOp::Between => "BETWEEN",
+                            ComparisonOp::NotBetween => "NOT BETWEEN",
+                            ComparisonOp::In => "IN",
+                            ComparisonOp::NotIn => "NOT IN",
+                        })
+                        .collect();
+                    result.push_str(&format!("{}ComparisonExpression [{}]\n", indent_str, ops.join(", ")));
+                } else if node.children.is_empty() {
                     let value = &self.get_token(node.begin_token).image;
                     result.push_str(&format!("{}ComparisonExpression(\"{}\")\n", indent_str, value));
                 } else {
                     result.push_str(&format!("{}ComparisonExpression\n", indent_str));
-                    for child in &node.children {
-                        self.pretty_print_impl(*child, indent + 1, result);
-                    }
+                }
+                for child in &node.children {
+                    self.pretty_print_impl(*child, indent + 1, result);
                 }
             }
             AstNode::AddExpression(node) => {
@@ -200,14 +226,21 @@ impl Arena {
                 }
             }
             AstNode::UnaryExpr(node) => {
-                if node.children.is_empty() {
+                if let Some(op) = &node.operator {
+                    let op_str = match op {
+                        UnaryOp::Plus => "+",
+                        UnaryOp::Negate => "-",
+                        UnaryOp::Not => "NOT",
+                    };
+                    result.push_str(&format!("{}UnaryExpr [{}]\n", indent_str, op_str));
+                } else if node.children.is_empty() {
                     let value = &self.get_token(node.begin_token).image;
                     result.push_str(&format!("{}UnaryExpr(\"{}\")\n", indent_str, value));
                 } else {
                     result.push_str(&format!("{}UnaryExpr\n", indent_str));
-                    for child in &node.children {
-                        self.pretty_print_impl(*child, indent + 1, result);
-                    }
+                }
+                for child in &node.children {
+                    self.pretty_print_impl(*child, indent + 1, result);
                 }
             }
             AstNode::PrimaryExpr(node) => {
@@ -316,6 +349,58 @@ pub enum MultExprOp {
     Token30,
 }
 
+/// Operator for equalityExpression
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum EqualityOp {
+    /// =
+    Equal,
+    /// <>
+    NotEqual,
+    /// IS NULL
+    IsNull,
+    /// IS NOT NULL
+    IsNotNull,
+}
+
+/// Operator for comparisonExpression
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ComparisonOp {
+    /// >
+    GreaterThan,
+    /// >=
+    GreaterThanEqual,
+    /// <
+    LessThan,
+    /// <=
+    LessThanEqual,
+    /// LIKE
+    Like,
+    /// NOT LIKE
+    NotLike,
+    /// BETWEEN
+    Between,
+    /// NOT BETWEEN
+    NotBetween,
+    /// IN
+    In,
+    /// NOT IN
+    NotIn,
+}
+
+/// Operator for unaryExpr
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum UnaryOp {
+    /// +
+    Plus,
+    /// -
+    Negate,
+    /// NOT
+    Not,
+}
+
 /// AST node for JmsSelector production
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -405,6 +490,8 @@ pub struct EqualityExpressionNode {
     pub parent: Option<NodeId>,
     /// Child nodes
     pub children: Vec<NodeId>,
+    /// Operators applied in this expression
+    pub operators: Vec<EqualityOp>,
     /// First token of this node
     pub begin_token: TokenId,
     /// Last token of this node
@@ -417,6 +504,7 @@ impl EqualityExpressionNode {
         EqualityExpressionNode {
             parent: None,
             children: Vec::new(),
+            operators: Vec::new(),
             begin_token,
             end_token,
         }
@@ -432,6 +520,8 @@ pub struct ComparisonExpressionNode {
     pub parent: Option<NodeId>,
     /// Child nodes
     pub children: Vec<NodeId>,
+    /// Operators applied in this expression
+    pub operators: Vec<ComparisonOp>,
     /// First token of this node
     pub begin_token: TokenId,
     /// Last token of this node
@@ -444,6 +534,7 @@ impl ComparisonExpressionNode {
         ComparisonExpressionNode {
             parent: None,
             children: Vec::new(),
+            operators: Vec::new(),
             begin_token,
             end_token,
         }
@@ -567,6 +658,8 @@ pub struct UnaryExprNode {
     pub parent: Option<NodeId>,
     /// Child nodes
     pub children: Vec<NodeId>,
+    /// Prefix unary operator (if any)
+    pub operator: Option<UnaryOp>,
     /// First token of this node
     pub begin_token: TokenId,
     /// Last token of this node
@@ -579,6 +672,7 @@ impl UnaryExprNode {
         UnaryExprNode {
             parent: None,
             children: Vec::new(),
+            operator: None,
             begin_token,
             end_token,
         }

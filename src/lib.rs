@@ -61,3 +61,6 @@ pub use arena::StringLitteralNode;
 pub use arena::VariableNode;
 pub use arena::AddOp;
 pub use arena::MultExprOp;
+pub use arena::EqualityOp;
+pub use arena::ComparisonOp;
+pub use arena::UnaryOp;

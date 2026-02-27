@@ -6,6 +6,7 @@ use crate::lexer::Lexer;
 use crate::arena::{Arena, AstNode, NodeId, TokenId};
 use crate::arena::AddOp;
 use crate::arena::MultExprOp;
+use crate::arena::{EqualityOp, ComparisonOp, UnaryOp};
 use crate::arena::{
     JmsSelectorNode,
     OrExpressionNode,
@@ -144,6 +145,7 @@ impl Parser {
     fn parse_equality_expression(&mut self) -> ParseResult<NodeId> {
         let begin_token = self.alloc_current_token();
         let mut children: Vec<NodeId> = Vec::new();
+        let mut operators: Vec<EqualityOp> = Vec::new();
 
         {
             let child = self.parse_comparison_expression()?;
@@ -152,6 +154,7 @@ impl Parser {
         loop {
         if self.current_token.token_type == TokenType::Token17
         {
+        operators.push(EqualityOp::Equal);
         self.expect_token(TokenType::Token17)?;
         {
             let child = self.parse_comparison_expression()?;
@@ -160,21 +163,24 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::Token18
         {
+        operators.push(EqualityOp::NotEqual);
         self.expect_token(TokenType::Token18)?;
         {
             let child = self.parse_comparison_expression()?;
             children.push(child);
         }
         }
-        else if 
+        else if
             self.current_token.token_type == TokenType::IS
             && self.lookahead_type(1) == Some(TokenType::NULL)
         {
+        operators.push(EqualityOp::IsNull);
         self.expect_token(TokenType::IS)?;
         self.expect_token(TokenType::NULL)?;
         }
         else if self.current_token.token_type == TokenType::IS
         {
+        operators.push(EqualityOp::IsNotNull);
         self.expect_token(TokenType::IS)?;
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::NULL)?;
@@ -187,6 +193,7 @@ impl Parser {
         let end_token = self.current_token_id.unwrap_or(begin_token);
         let mut node = EqualityExpressionNode::new(begin_token, end_token);
         node.children = children.clone();
+        node.operators = operators;
         let node_id = self.arena.alloc_node(AstNode::EqualityExpression(node));
         for child_id in children {
             self.set_parent(child_id, node_id);
@@ -198,6 +205,7 @@ impl Parser {
     fn parse_comparison_expression(&mut self) -> ParseResult<NodeId> {
         let begin_token = self.alloc_current_token();
         let mut children: Vec<NodeId> = Vec::new();
+        let mut operators: Vec<ComparisonOp> = Vec::new();
 
         {
             let child = self.parse_add_expression()?;
@@ -206,6 +214,7 @@ impl Parser {
         loop {
         if self.current_token.token_type == TokenType::Token19
         {
+        operators.push(ComparisonOp::GreaterThan);
         self.expect_token(TokenType::Token19)?;
         {
             let child = self.parse_add_expression()?;
@@ -214,6 +223,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::Token20
         {
+        operators.push(ComparisonOp::GreaterThanEqual);
         self.expect_token(TokenType::Token20)?;
         {
             let child = self.parse_add_expression()?;
@@ -222,6 +232,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::Token21
         {
+        operators.push(ComparisonOp::LessThan);
         self.expect_token(TokenType::Token21)?;
         {
             let child = self.parse_add_expression()?;
@@ -230,6 +241,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::Token22
         {
+        operators.push(ComparisonOp::LessThanEqual);
         self.expect_token(TokenType::Token22)?;
         {
             let child = self.parse_add_expression()?;
@@ -238,6 +250,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::LIKE
         {
+        operators.push(ComparisonOp::Like);
         self.expect_token(TokenType::LIKE)?;
         {
             let child = self.parse_string_litteral()?;
@@ -252,10 +265,11 @@ impl Parser {
         }
         }
         }
-        else if 
+        else if
             self.current_token.token_type == TokenType::NOT
             && self.lookahead_type(1) == Some(TokenType::LIKE)
         {
+        operators.push(ComparisonOp::NotLike);
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::LIKE)?;
         {
@@ -273,6 +287,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::BETWEEN
         {
+        operators.push(ComparisonOp::Between);
         self.expect_token(TokenType::BETWEEN)?;
         {
             let child = self.parse_add_expression()?;
@@ -284,10 +299,11 @@ impl Parser {
             children.push(child);
         }
         }
-        else if 
+        else if
             self.current_token.token_type == TokenType::NOT
             && self.lookahead_type(1) == Some(TokenType::BETWEEN)
         {
+        operators.push(ComparisonOp::NotBetween);
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::BETWEEN)?;
         {
@@ -302,6 +318,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::IN
         {
+        operators.push(ComparisonOp::In);
         self.expect_token(TokenType::IN)?;
         self.expect_token(TokenType::Token23)?;
         {
@@ -318,11 +335,12 @@ impl Parser {
         }
         self.expect_token(TokenType::Token25)?;
         }
-        else if 
+        else if
             self.current_token.token_type == TokenType::NOT
             && self.lookahead_type(1) == Some(TokenType::IN)
             && self.lookahead_type(2) == Some(TokenType::Token23)
         {
+        operators.push(ComparisonOp::NotIn);
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::IN)?;
         self.expect_token(TokenType::Token23)?;
@@ -348,6 +366,7 @@ impl Parser {
         let end_token = self.current_token_id.unwrap_or(begin_token);
         let mut node = ComparisonExpressionNode::new(begin_token, end_token);
         node.children = children.clone();
+        node.operators = operators;
         let node_id = self.arena.alloc_node(AstNode::ComparisonExpression(node));
         for child_id in children {
             self.set_parent(child_id, node_id);
@@ -433,10 +452,12 @@ impl Parser {
     fn parse_unary_expr(&mut self) -> ParseResult<NodeId> {
         let begin_token = self.alloc_current_token();
         let mut children: Vec<NodeId> = Vec::new();
+        let mut operator: Option<UnaryOp> = None;
 
-        if 
+        if
             self.current_token.token_type == TokenType::Token26
         {
+        operator = Some(UnaryOp::Plus);
         self.expect_token(TokenType::Token26)?;
         {
             let child = self.parse_unary_expr()?;
@@ -445,6 +466,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::Token27
         {
+        operator = Some(UnaryOp::Negate);
         self.expect_token(TokenType::Token27)?;
         {
             let child = self.parse_unary_expr()?;
@@ -453,6 +475,7 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::NOT
         {
+        operator = Some(UnaryOp::Not);
         self.expect_token(TokenType::NOT)?;
         {
             let child = self.parse_unary_expr()?;
@@ -488,6 +511,7 @@ impl Parser {
         let end_token = self.current_token_id.unwrap_or(begin_token);
         let mut node = UnaryExprNode::new(begin_token, end_token);
         node.children = children.clone();
+        node.operator = operator;
         let node_id = self.arena.alloc_node(AstNode::UnaryExpr(node));
         for child_id in children {
             self.set_parent(child_id, node_id);
