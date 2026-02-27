@@ -78,6 +78,9 @@ impl Lexer {
     fn try_match_token(&mut self, start_pos: usize) -> ParseResult<Option<Token>> {
         let ch = self.current_char();
 
+        if self.matches_string("!=") {
+            return Ok(Some(self.consume_literal(TokenType::NE, "!=", start_pos)));
+        }
         if self.matches_string("<>") {
             return Ok(Some(self.consume_literal(TokenType::NE, "<>", start_pos)));
         }

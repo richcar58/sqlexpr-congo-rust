@@ -130,6 +130,11 @@ fn test_ne_operator() {
 }
 
 #[test]
+fn test_ne_operator_2() {
+    assert_tokens("!=", &[(TokenType::NE, "!=")]);
+}
+
+#[test]
 fn test_ge_operator() {
     assert_tokens(">=", &[(TokenType::GE, ">=")]);
 }
@@ -385,11 +390,12 @@ fn test_offsets_with_whitespace() {
 
 #[test]
 fn test_offsets_multi_char_tokens() {
-    let tokens = tokenize_with_offsets("<> >= <=");
+    let tokens = tokenize_with_offsets("<> >= <= !=");
     println!("Offsets for '<> >= <=': {:?}", tokens);
     assert_eq!(tokens[0], (TokenType::NE, "<>".to_string(), 0, 2));
     assert_eq!(tokens[1], (TokenType::GE, ">=".to_string(), 3, 5));
     assert_eq!(tokens[2], (TokenType::LE, "<=".to_string(), 6, 8));
+    assert_eq!(tokens[3], (TokenType::NE, "!=".to_string(), 9, 11));
 }
 
 #[test]
@@ -605,6 +611,27 @@ fn test_complex_expression() {
     );
 }
 
+#[test]
+fn test_complex_expression_2() {
+    assert_tokens(
+        "a >= 1 AND b != 'x' OR NOT c IS NULL",
+        &[
+            (TokenType::ID, "a"),
+            (TokenType::GE, ">="),
+            (TokenType::DECIMAL_LITERAL, "1"),
+            (TokenType::AND, "AND"),
+            (TokenType::ID, "b"),
+            (TokenType::NE, "!="),
+            (TokenType::STRING_LITERAL, "'x'"),
+            (TokenType::OR, "OR"),
+            (TokenType::NOT, "NOT"),
+            (TokenType::ID, "c"),
+            (TokenType::IS, "IS"),
+            (TokenType::NULL, "NULL"),
+        ],
+    );
+}
+
 // ========== Tokens Without Separating Whitespace ==========
 
 #[test]
@@ -800,10 +827,11 @@ fn test_error_unterminated_empty_string() {
 #[test]
 fn test_all_operators_in_sequence() {
     assert_tokens(
-        "= <> > >= < <= ( , ) + - * / %",
+        "= <> != > >= < <= ( , ) + - * / %",
         &[
             (TokenType::EQ, "="),
             (TokenType::NE, "<>"),
+            (TokenType::NE, "!="),
             (TokenType::GT, ">"),
             (TokenType::GE, ">="),
             (TokenType::LT, "<"),
@@ -874,6 +902,12 @@ fn test_consecutive_operators() {
 fn test_le_ne_adjacent() {
     // `<>=` should be NE, EQ (since `<>` matches first as NE)
     assert_tokens("<>=", &[(TokenType::NE, "<>"), (TokenType::EQ, "=")]);
+}
+
+#[test]
+fn test_eq_ne_adjacent() {
+    // `!==` should be NE, EQ (since `!=` matches first as NE)
+    assert_tokens("!==", &[(TokenType::NE, "!="), (TokenType::EQ, "=")]);
 }
 
 #[test]

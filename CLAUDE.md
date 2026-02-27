@@ -23,7 +23,7 @@ The parser is a hand-written recursive-descent parser generated from a CongoCC g
 ### Key Components
 
 - **`SqlExprParser.ccc`** - CongoCC grammar definition (source of truth for the language). Originally derived from an Apache ActiveMQ JMS selector parser.
-- **`src/tokens.rs`** - Token types (`TokenType` enum). All variants have descriptive UPPER_SNAKE_CASE names: operators (`EQ`, `NE`, `GT`, `GE`, `LT`, `LE`, `PLUS`, `MINUS`, `STAR`, `SLASH`, `PERCENT`), delimiters (`LPAREN`, `COMMA`, `RPAREN`), whitespace (`SPACE`, `TAB`, `NEWLINE`, `CR`, `FORM_FEED`), keywords, and literals.
+- **`src/tokens.rs`** - Token types (`TokenType` enum). All variants have descriptive UPPER_SNAKE_CASE names: operators (`EQ`, `NE`, `GT`, `GE`, `LT`, `LE`, `PLUS`, `MINUS`, `STAR`, `SLASH`, `PERCENT`), delimiters (`LPAREN`, `COMMA`, `RPAREN`), whitespace (`SPACE`, `TAB`, `NEWLINE`, `CR`, `FORM_FEED`), comments (`LINE_COMMENT`, `BLOCK_COMMENT`), keywords, and literals.
 - **`src/lexer.rs`** - Lexer with case-insensitive keyword matching. Skips whitespace; produces tokens with offset tracking.
 - **`src/parser.rs`** - Recursive-descent parser. Entry point: `Parser::new(input).parse()` returns `ParseResult<NodeId>`.
 - **`src/arena.rs`** - Arena allocator owning all AST nodes and tokens. `NodeId`/`TokenId` are type-safe indices (newtype over `usize`). Contains the `AstNode` enum (12 variants) and per-node structs. Also has `pretty_print()` with pass-through node elision.

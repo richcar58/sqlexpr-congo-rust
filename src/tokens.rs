@@ -45,7 +45,7 @@ pub enum TokenType {
     NULL,
     /// Operator: = (equals)
     EQ,
-    /// Operator: <> (not equals)
+    /// Operator: <> or != (not equals)
     NE,
     /// Operator: > (greater than)
     GT,

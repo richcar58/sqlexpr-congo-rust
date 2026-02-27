@@ -227,6 +227,18 @@ fn test_not_equal() {
 }
 
 #[test]
+fn test_not_equal_2() {
+    let (p, root) = parse_ok("x != 5");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        assert_eq!(eq.operators, vec![EqualityOp::NotEqual]);
+        assert_eq!(eq.children.len(), 2);
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+#[test]
 fn test_is_null() {
     let (p, root) = parse_ok("x IS NULL");
     let n = skip(p.arena(), root);
@@ -881,6 +893,13 @@ fn test_between_with_arithmetic_bounds() {
 #[test]
 fn test_in_with_and_or() {
     let (p, root) = parse_ok("a IN ('x', 'y') AND b = 1 OR c <> 2");
+    let n = skip(p.arena(), root);
+    assert!(matches!(p.arena().get_node(n), AstNode::OrExpression(_)));
+}
+
+#[test]
+fn test_in_with_and_or_2() {
+    let (p, root) = parse_ok("a IN ('x', 'y') AND b = 1 OR c != 2");
     let n = skip(p.arena(), root);
     assert!(matches!(p.arena().get_node(n), AstNode::OrExpression(_)));
 }
