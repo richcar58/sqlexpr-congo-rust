@@ -1,0 +1,100 @@
+// use parser::{Parser, Arena, NodeId, AstNode, ParseError};
+use arithmetic::*;
+use std::any::Any;
+//use sqlexpr::*;
+fn main() -> Result<(), ParseError>{
+    println!("Parsing...");
+
+    //let input = "b > 5";
+    let input = "4 * 6 + 7 / 8".to_string();
+    let mut parser = Parser::new(input.to_string()).unwrap();
+    let result = parser.parse();
+    println!("Result: {:?}", result);   
+    assert!(result.is_ok(), "Parse failed: {:?}", result.err());
+
+        // Parse returns root node ID
+    let root_id = result.unwrap();
+
+    // Access nodes through the arena
+    let arena = parser.arena();
+    let ast = arena.pretty_print(root_id, 0, &parser.input());
+    println!("{}", ast);
+    process(root_id, arena, 0);
+
+// --------------------------------------------------------------
+    let mut my_string = "Hello, world!".to_string();
+    let mut my_int = 42;
+
+    println!();
+    process_dynamic_value(Some(&mut my_string));
+    process_dynamic_value(Some(&mut my_int));
+    process_dynamic_value(None);
+
+    println!();
+    let mut my_struct = MyStruct {
+        name: "Test".to_string(),
+        value: 100,
+    };
+    process_dynamic_value(Some(&mut my_struct));
+    println!("It's a MyStruct: name = {}, value = {}", my_struct.name, my_struct.value);
+
+// --------------------------------------------------------------
+
+    // println!("Parsing completed successfully.");
+    Ok(())
+}
+
+struct MyStruct {
+    name: String,
+    value: i32,
+}
+
+
+fn process_dynamic_value(v: Option<&mut dyn Any>) {
+    if v.is_none() {
+        println!("No value provided");
+        return; 
+    } 
+    let value = v.unwrap();
+
+
+    if let Some(s) = value.downcast_ref::<String>() {
+        println!("It's a String: \"{}\"", s);
+    } else if let Some(n) = value.downcast_ref::<i32>() {
+        println!("It's an i32: {}", n);
+    } else if let Some(my_struct) = value.downcast_mut::<MyStruct>() {
+        println!("It's a MyStruct: name = {}, value = {}", my_struct.name, my_struct.value);
+        my_struct.value += 1; // Modify the value field    
+        println!("It's a MyStruct: name = {}, value = {}", my_struct.name, my_struct.value);
+    } else {
+        println!("It's another type");
+    }
+}
+
+
+fn process(node_id: NodeId, arena: &Arena, indent: usize) {
+    let node = arena.get_node(node_id);
+    match node {
+        AstNode::Expression(expr) => {
+            println!("Processing Expression Node with {} children", expr.children.len());
+            for &child_id in &expr.children {
+                process(child_id, arena, indent + 2);
+            }
+        }
+        AstNode::AdditiveExpression(add_expr) => {
+            println!("Processing AdditiveExpression Node with {} children", add_expr.children.len());
+            for &child_id in &add_expr.children {
+                process(child_id, arena, indent + 2);
+            }
+        }
+        AstNode::MultiplicativeExpression(mul_expr) => {
+            println!("Processing MultiplicativeExpression Node with {} children", mul_expr.children.len());
+            for &child_id in &mul_expr.children {
+                process(child_id, arena, indent + 2);
+            }
+        }
+        AstNode::Primary(primary) => {
+            println!("Processing Primary Node with token ID {:?}", primary.begin_token);
+        }
+    }
+}
