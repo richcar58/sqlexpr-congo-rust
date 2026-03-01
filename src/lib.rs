@@ -36,6 +36,7 @@ mod tokens;
 mod arena;
 mod lexer;
 mod parser;
+mod evaluator;
 mod visitor;
 
 // Re-export public API
