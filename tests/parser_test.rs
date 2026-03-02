@@ -1424,3 +1424,488 @@ fn test_in_int_float_mixed_error() {
     let msg = parse_err("x IN (1, 2.5)");
     assert!(msg.contains("same type"), "msg was: {}", msg);
 }
+
+// ========== Hex/Octal/Decimal interchangeability tests ==========
+
+// ---------- Basic parsing of hex and octal literals ----------
+
+#[test]
+fn test_hex_literal() {
+    let (p, root) = parse_ok("0xFF = 255");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        assert_eq!(eq.operators, vec![EqualityOp::Equal]);
+        assert_eq!(leaf_image(p.arena(), eq.children[0]), "0xFF");
+        assert_eq!(leaf_image(p.arena(), eq.children[1]), "255");
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+#[test]
+fn test_octal_literal() {
+    let (p, root) = parse_ok("010 = 8");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        assert_eq!(eq.operators, vec![EqualityOp::Equal]);
+        assert_eq!(leaf_image(p.arena(), eq.children[0]), "010");
+        assert_eq!(leaf_image(p.arena(), eq.children[1]), "8");
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+// ---------- Comparison operators with mixed formats ----------
+
+#[test]
+fn test_hex_greater_than_decimal() {
+    let (p, root) = parse_ok("0xA > 5");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::GreaterThan]);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_octal_less_than_hex() {
+    let (p, root) = parse_ok("077 < 0xFF");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::LessThan]);
+        assert_eq!(leaf_image(p.arena(), cmp.children[0]), "077");
+        assert_eq!(leaf_image(p.arena(), cmp.children[1]), "0xFF");
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_decimal_gte_octal() {
+    let (p, root) = parse_ok("100 >= 010");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::GreaterThanEqual]);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_hex_lte_decimal() {
+    let (p, root) = parse_ok("0x10 <= 20");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::LessThanEqual]);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+// ---------- Equality operators with mixed formats ----------
+
+#[test]
+fn test_hex_eq_octal() {
+    let (p, root) = parse_ok("0xA = 012");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        assert_eq!(eq.operators, vec![EqualityOp::Equal]);
+        assert_eq!(leaf_image(p.arena(), eq.children[0]), "0xA");
+        assert_eq!(leaf_image(p.arena(), eq.children[1]), "012");
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+#[test]
+fn test_octal_ne_decimal() {
+    let (p, root) = parse_ok("077 <> 100");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        assert_eq!(eq.operators, vec![EqualityOp::NotEqual]);
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+// ---------- Arithmetic with mixed formats ----------
+
+#[test]
+fn test_hex_plus_decimal() {
+    let (p, root) = parse_ok("0xA + 5 = 15");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), eq.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus]);
+            assert_eq!(leaf_image(p.arena(), add.children[0]), "0xA");
+            assert_eq!(leaf_image(p.arena(), add.children[1]), "5");
+        } else {
+            panic!("expected AddExpression on LHS");
+        }
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+#[test]
+fn test_octal_minus_hex() {
+    let (p, root) = parse_ok("0100 - 0x10 > 0");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::GreaterThan]);
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Minus]);
+        } else {
+            panic!("expected AddExpression");
+        }
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_hex_star_octal() {
+    let (p, root) = parse_ok("0x2 * 010 = 16");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), eq.children[0]);
+        if let AstNode::MultExpr(mult) = p.arena().get_node(lhs) {
+            assert_eq!(mult.operators, vec![MultExprOp::Star]);
+        } else {
+            panic!("expected MultExpr");
+        }
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+#[test]
+fn test_decimal_slash_hex() {
+    let (p, root) = parse_ok("100 / 0xA > 0");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mult) = p.arena().get_node(lhs) {
+            assert_eq!(mult.operators, vec![MultExprOp::Slash]);
+        } else {
+            panic!("expected MultExpr");
+        }
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_octal_percent_decimal() {
+    let (p, root) = parse_ok("017 % 5 = 0");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), eq.children[0]);
+        if let AstNode::MultExpr(mult) = p.arena().get_node(lhs) {
+            assert_eq!(mult.operators, vec![MultExprOp::Percent]);
+        } else {
+            panic!("expected MultExpr");
+        }
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+// ---------- Unary operators with hex/octal ----------
+
+#[test]
+fn test_unary_negate_hex() {
+    let (p, root) = parse_ok("-0xFF > 0");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
+            assert_eq!(u.operator, Some(UnaryOp::Negate));
+        } else {
+            panic!("expected UnaryExpr");
+        }
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_unary_plus_octal() {
+    let (p, root) = parse_ok("+010 = 8");
+    let n = skip(p.arena(), root);
+    if let AstNode::EqualityExpression(eq) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), eq.children[0]);
+        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
+            assert_eq!(u.operator, Some(UnaryOp::Plus));
+        } else {
+            panic!("expected UnaryExpr");
+        }
+    } else {
+        panic!("expected EqualityExpression");
+    }
+}
+
+// ---------- BETWEEN with hex/octal bounds ----------
+
+#[test]
+fn test_between_hex_bounds() {
+    let (p, root) = parse_ok("x BETWEEN 0xA AND 0xFF");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+        assert_eq!(leaf_image(p.arena(), cmp.children[1]), "0xA");
+        assert_eq!(leaf_image(p.arena(), cmp.children[2]), "0xFF");
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_octal_bounds() {
+    let (p, root) = parse_ok("x BETWEEN 010 AND 077");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+        assert_eq!(leaf_image(p.arena(), cmp.children[1]), "010");
+        assert_eq!(leaf_image(p.arena(), cmp.children[2]), "077");
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_mixed_decimal_hex() {
+    let (p, root) = parse_ok("x BETWEEN 10 AND 0xFF");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_mixed_octal_decimal() {
+    let (p, root) = parse_ok("x BETWEEN 010 AND 100");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_mixed_hex_octal() {
+    let (p, root) = parse_ok("x BETWEEN 0x1 AND 077");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_not_between_hex_bounds() {
+    let (p, root) = parse_ok("x NOT BETWEEN 0x0 AND 0xF");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::NotBetween]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_hex_bounds_ordering_error() {
+    let msg = parse_err("x BETWEEN 0xFF AND 0xA");
+    assert!(msg.contains("lower bound"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_between_octal_bounds_ordering_error() {
+    let msg = parse_err("x BETWEEN 077 AND 010");
+    assert!(msg.contains("lower bound"), "msg was: {}", msg);
+}
+
+// ---------- IN with hex/octal elements ----------
+
+#[test]
+fn test_in_hex_list() {
+    let (p, root) = parse_ok("x IN (0xA, 0xB, 0xC)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4); // variable + 3 hex values
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_octal_list() {
+    let (p, root) = parse_ok("x IN (010, 020, 030)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4); // variable + 3 octal values
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_mixed_decimal_hex() {
+    let (p, root) = parse_ok("x IN (10, 0xFF, 42)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_mixed_decimal_octal() {
+    let (p, root) = parse_ok("x IN (8, 010, 16)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_mixed_hex_octal() {
+    let (p, root) = parse_ok("x IN (0xA, 012, 0xB)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_all_three_formats() {
+    let (p, root) = parse_ok("x IN (42, 0xFF, 010)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_not_in_hex_list() {
+    let (p, root) = parse_ok("x NOT IN (0xA, 0xB)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::NotIn]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+// ---------- IN type errors: hex/octal cannot mix with float or string ----------
+
+#[test]
+fn test_in_hex_float_mixed_error() {
+    let msg = parse_err("x IN (0xFF, 2.5)");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_octal_float_mixed_error() {
+    let msg = parse_err("x IN (010, 1.5)");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_float_hex_mixed_error() {
+    let msg = parse_err("x IN (1.5, 0xA)");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_string_hex_mixed_error() {
+    let msg = parse_err("x IN ('a', 0xA)");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_hex_string_mixed_error() {
+    let msg = parse_err("x IN (0xA, 'a')");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+// ---------- Parenthesized expressions with hex/octal ----------
+
+#[test]
+fn test_parenthesized_hex_arithmetic() {
+    let (p, root) = parse_ok("(0xA + 010) > 5");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::GreaterThan]);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+// ---------- Complex expressions mixing all three formats ----------
+
+#[test]
+fn test_complex_all_formats_in_and_or() {
+    let (p, root) = parse_ok("x = 0xFF AND y > 010 OR z < 42");
+    let n = skip(p.arena(), root);
+    assert!(matches!(p.arena().get_node(n), AstNode::OrExpression(_)));
+}
+
+#[test]
+fn test_complex_between_and_in_mixed_formats() {
+    let (p, root) = parse_ok("x BETWEEN 0xA AND 0xFF AND y IN (010, 020)");
+    let n = skip(p.arena(), root);
+    if let AstNode::AndExpression(and) = p.arena().get_node(n) {
+        assert_eq!(and.children.len(), 2);
+    } else {
+        panic!("expected AndExpression");
+    }
+}
+
+#[test]
+fn test_complex_arithmetic_all_formats() {
+    let (p, root) = parse_ok("0xA + 010 - 5 > 0");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::GreaterThan]);
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus, AddOp::Minus]);
+            assert_eq!(add.children.len(), 3);
+            assert_eq!(leaf_image(p.arena(), add.children[0]), "0xA");
+            assert_eq!(leaf_image(p.arena(), add.children[1]), "010");
+            assert_eq!(leaf_image(p.arena(), add.children[2]), "5");
+        } else {
+            panic!("expected AddExpression");
+        }
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}

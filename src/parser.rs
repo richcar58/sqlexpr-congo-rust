@@ -669,10 +669,11 @@ impl Parser {
 
     // ========== BETWEEN / IN Helper Methods ==========
 
-    /// Parse a BETWEEN bound: only accepts DECIMAL_LITERAL or STRING_LITERAL.
+    /// Parse a BETWEEN bound: only accepts numeric literals or STRING_LITERAL.
     fn parse_between_bound(&mut self) -> ParseResult<NodeId> {
         match self.current_token.token_type {
-            TokenType::DECIMAL_LITERAL | TokenType::STRING_LITERAL => {
+            TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL
+            | TokenType::OCTAL_LITERAL | TokenType::STRING_LITERAL => {
                 self.parse_primary_expr()
             }
             TokenType::TRUE | TokenType::FALSE => {
@@ -758,8 +759,8 @@ impl Parser {
         let low_type = self.get_literal_token_type(low_id);
         let high_type = self.get_literal_token_type(high_id);
 
-        let low_is_numeric = low_type == TokenType::DECIMAL_LITERAL;
-        let high_is_numeric = high_type == TokenType::DECIMAL_LITERAL;
+        let low_is_numeric = matches!(low_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL);
+        let high_is_numeric = matches!(high_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL);
         let low_is_string = low_type == TokenType::STRING_LITERAL;
         let high_is_string = high_type == TokenType::STRING_LITERAL;
 
@@ -771,10 +772,10 @@ impl Parser {
         }
 
         if low_is_numeric && high_is_numeric {
-            let low_val: f64 = low_image.parse().map_err(|_| {
+            let low_val = Self::parse_numeric_literal(&low_image).map_err(|_| {
                 ParseError::new(format!("Invalid numeric literal in BETWEEN: '{}'", low_image))
             })?;
-            let high_val: f64 = high_image.parse().map_err(|_| {
+            let high_val = Self::parse_numeric_literal(&high_image).map_err(|_| {
                 ParseError::new(format!("Invalid numeric literal in BETWEEN: '{}'", high_image))
             })?;
             if low_val > high_val {
@@ -798,10 +799,29 @@ impl Parser {
         Ok(())
     }
 
+    /// Parse a numeric literal image (decimal, hex, or octal) to f64.
+    fn parse_numeric_literal(image: &str) -> Result<f64, String> {
+        if let Some(hex) = image.strip_prefix("0x").or_else(|| image.strip_prefix("0X")) {
+            i64::from_str_radix(hex, 16)
+                .map(|i| i as f64)
+                .map_err(|e| e.to_string())
+        } else if image.starts_with('0') && image.len() > 1
+            && image[1..].chars().all(|c| ('0'..='7').contains(&c))
+        {
+            let oct = &image[1..];
+            i64::from_str_radix(oct, 8)
+                .map(|i| i as f64)
+                .map_err(|e| e.to_string())
+        } else {
+            image.parse::<f64>().map_err(|e| e.to_string())
+        }
+    }
+
     /// Classify current token for IN list element type checking.
     fn classify_current_token_for_in(&self) -> ParseResult<InElementType> {
         match self.current_token.token_type {
             TokenType::STRING_LITERAL => Ok(InElementType::StringLit),
+            TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL => Ok(InElementType::Integer),
             TokenType::DECIMAL_LITERAL => {
                 if self.current_token.image.contains('.') {
                     Ok(InElementType::Float)
@@ -856,11 +876,11 @@ impl Parser {
         }
     }
 
-    /// Parse an IN list element: STRING_LITERAL or DECIMAL_LITERAL.
+    /// Parse an IN list element: STRING_LITERAL or numeric literal.
     fn parse_in_element(&mut self) -> ParseResult<NodeId> {
         match self.current_token.token_type {
             TokenType::STRING_LITERAL => self.parse_string_literal(),
-            TokenType::DECIMAL_LITERAL => {
+            TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL => {
                 // Parse as a literal (produces PrimaryExpr -> Literal)
                 self.parse_primary_expr()
             }
