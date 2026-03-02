@@ -957,6 +957,340 @@ fn test_decimal_with_many_places() {
     assert_tokens("3.14159265358979", &[(TokenType::DECIMAL_LITERAL, "3.14159265358979")]);
 }
 
+// ========== Comprehensive numeric literal tests ==========
+
+// ---------- Decimal integer literals ----------
+
+#[test]
+fn test_decimal_zero() {
+    assert_tokens("0", &[(TokenType::DECIMAL_LITERAL, "0")]);
+}
+
+#[test]
+fn test_decimal_single_digit() {
+    assert_tokens("9", &[(TokenType::DECIMAL_LITERAL, "9")]);
+}
+
+#[test]
+fn test_decimal_multi_digit() {
+    assert_tokens("1024", &[(TokenType::DECIMAL_LITERAL, "1024")]);
+}
+
+#[test]
+fn test_decimal_in_expression() {
+    assert_tokens(
+        "100 + 200",
+        &[
+            (TokenType::DECIMAL_LITERAL, "100"),
+            (TokenType::PLUS, "+"),
+            (TokenType::DECIMAL_LITERAL, "200"),
+        ],
+    );
+}
+
+#[test]
+fn test_decimal_adjacent_to_operator() {
+    assert_tokens(
+        "42>10",
+        &[
+            (TokenType::DECIMAL_LITERAL, "42"),
+            (TokenType::GT, ">"),
+            (TokenType::DECIMAL_LITERAL, "10"),
+        ],
+    );
+}
+
+// ---------- Decimal float literals ----------
+
+#[test]
+fn test_float_leading_zero() {
+    assert_tokens("0.5", &[(TokenType::DECIMAL_LITERAL, "0.5")]);
+}
+
+#[test]
+fn test_float_leading_dot() {
+    assert_tokens(".5", &[(TokenType::DECIMAL_LITERAL, ".5")]);
+}
+
+#[test]
+fn test_float_leading_dot_multi_digit() {
+    assert_tokens(".123", &[(TokenType::DECIMAL_LITERAL, ".123")]);
+}
+
+#[test]
+fn test_float_whole_and_fraction() {
+    assert_tokens("99.99", &[(TokenType::DECIMAL_LITERAL, "99.99")]);
+}
+
+#[test]
+fn test_float_zero_dot_zero() {
+    assert_tokens("0.0", &[(TokenType::DECIMAL_LITERAL, "0.0")]);
+}
+
+#[test]
+fn test_float_in_expression() {
+    assert_tokens(
+        "3.14 + .5",
+        &[
+            (TokenType::DECIMAL_LITERAL, "3.14"),
+            (TokenType::PLUS, "+"),
+            (TokenType::DECIMAL_LITERAL, ".5"),
+        ],
+    );
+}
+
+#[test]
+fn test_float_adjacent_to_paren() {
+    assert_tokens(
+        "(.25)",
+        &[
+            (TokenType::LPAREN, "("),
+            (TokenType::DECIMAL_LITERAL, ".25"),
+            (TokenType::RPAREN, ")"),
+        ],
+    );
+}
+
+#[test]
+fn test_float_dot_no_trailing_digit_is_error() {
+    // `5.` at end of input: number stops before dot, dot is unexpected
+    let mut lexer = Lexer::new("5.".to_string());
+    let tok = lexer.next_token().unwrap();
+    assert_eq!(tok.token_type, TokenType::DECIMAL_LITERAL);
+    assert_eq!(tok.image, "5");
+    let err = lexer.next_token().unwrap_err();
+    assert!(err.message.contains("Unexpected character"));
+}
+
+#[test]
+fn test_float_dot_followed_by_non_digit_is_error() {
+    // `5.x`: number stops before dot, dot is unexpected
+    let mut lexer = Lexer::new("5.x".to_string());
+    let tok = lexer.next_token().unwrap();
+    assert_eq!(tok.token_type, TokenType::DECIMAL_LITERAL);
+    assert_eq!(tok.image, "5");
+    let err = lexer.next_token().unwrap_err();
+    assert!(err.message.contains("Unexpected character"));
+}
+
+// ---------- Hex literals ----------
+
+#[test]
+fn test_hex_lowercase() {
+    assert_tokens("0xff", &[(TokenType::HEX_LITERAL, "0xff")]);
+}
+
+#[test]
+fn test_hex_uppercase() {
+    assert_tokens("0XFF", &[(TokenType::HEX_LITERAL, "0XFF")]);
+}
+
+#[test]
+fn test_hex_mixed_case() {
+    assert_tokens("0xAbCd", &[(TokenType::HEX_LITERAL, "0xAbCd")]);
+}
+
+#[test]
+fn test_hex_single_digit() {
+    assert_tokens("0x0", &[(TokenType::HEX_LITERAL, "0x0")]);
+}
+
+#[test]
+fn test_hex_all_digits() {
+    assert_tokens("0x0123456789abcdef", &[(TokenType::HEX_LITERAL, "0x0123456789abcdef")]);
+}
+
+#[test]
+fn test_hex_in_expression() {
+    assert_tokens(
+        "0xFF = 255",
+        &[
+            (TokenType::HEX_LITERAL, "0xFF"),
+            (TokenType::EQ, "="),
+            (TokenType::DECIMAL_LITERAL, "255"),
+        ],
+    );
+}
+
+#[test]
+fn test_hex_adjacent_to_paren() {
+    assert_tokens(
+        "(0xA)",
+        &[
+            (TokenType::LPAREN, "("),
+            (TokenType::HEX_LITERAL, "0xA"),
+            (TokenType::RPAREN, ")"),
+        ],
+    );
+}
+
+#[test]
+fn test_hex_missing_digits_is_error() {
+    // `0x` with no hex digits following
+    let err = tokenize_err("0x");
+    assert!(err.message.contains("hex digit"), "Expected hex digit error, got: {}", err.message);
+}
+
+#[test]
+fn test_hex_missing_digits_before_operator_is_error() {
+    // `0x+1` — no hex digits between prefix and operator
+    let err = tokenize_err("0x+1");
+    assert!(err.message.contains("hex digit"), "Expected hex digit error, got: {}", err.message);
+}
+
+// ---------- Octal literals ----------
+
+#[test]
+fn test_octal_simple() {
+    assert_tokens("010", &[(TokenType::OCTAL_LITERAL, "010")]);
+}
+
+#[test]
+fn test_octal_zero_zero() {
+    assert_tokens("00", &[(TokenType::OCTAL_LITERAL, "00")]);
+}
+
+#[test]
+fn test_octal_all_digits() {
+    assert_tokens("01234567", &[(TokenType::OCTAL_LITERAL, "01234567")]);
+}
+
+#[test]
+fn test_octal_stops_at_eight() {
+    // `08` — '8' is not an octal digit, so only '0' is consumed as octal...
+    // but actually '0' followed by '8': peek(1) is '8' which is NOT in '0'..'7',
+    // so it falls through to decimal. '08' is a DECIMAL_LITERAL.
+    assert_tokens("08", &[(TokenType::DECIMAL_LITERAL, "08")]);
+}
+
+#[test]
+fn test_octal_stops_at_nine() {
+    // Same logic: '0' followed by '9' is not octal
+    assert_tokens("09", &[(TokenType::DECIMAL_LITERAL, "09")]);
+}
+
+#[test]
+fn test_octal_stops_at_non_octal_digit() {
+    // `0178` — octal consumes '0','1','7'; stops at '8' which becomes a separate decimal
+    assert_tokens(
+        "0178",
+        &[
+            (TokenType::OCTAL_LITERAL, "017"),
+            (TokenType::DECIMAL_LITERAL, "8"),
+        ],
+    );
+}
+
+#[test]
+fn test_octal_in_expression() {
+    assert_tokens(
+        "010 = 8",
+        &[
+            (TokenType::OCTAL_LITERAL, "010"),
+            (TokenType::EQ, "="),
+            (TokenType::DECIMAL_LITERAL, "8"),
+        ],
+    );
+}
+
+#[test]
+fn test_octal_adjacent_to_paren() {
+    assert_tokens(
+        "(077)",
+        &[
+            (TokenType::LPAREN, "("),
+            (TokenType::OCTAL_LITERAL, "077"),
+            (TokenType::RPAREN, ")"),
+        ],
+    );
+}
+
+// ---------- Mixed numeric types in expressions ----------
+
+#[test]
+fn test_numeric_types_in_comparison() {
+    assert_tokens(
+        "0xFF > 010",
+        &[
+            (TokenType::HEX_LITERAL, "0xFF"),
+            (TokenType::GT, ">"),
+            (TokenType::OCTAL_LITERAL, "010"),
+        ],
+    );
+}
+
+#[test]
+fn test_numeric_types_in_list() {
+    assert_tokens(
+        "0x1,07,3,.5",
+        &[
+            (TokenType::HEX_LITERAL, "0x1"),
+            (TokenType::COMMA, ","),
+            (TokenType::OCTAL_LITERAL, "07"),
+            (TokenType::COMMA, ","),
+            (TokenType::DECIMAL_LITERAL, "3"),
+            (TokenType::COMMA, ","),
+            (TokenType::DECIMAL_LITERAL, ".5"),
+        ],
+    );
+}
+
+#[test]
+fn test_numeric_offsets_hex() {
+    let tokens = tokenize_with_offsets("0xFF");
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(tokens[0], (TokenType::HEX_LITERAL, "0xFF".to_string(), 0, 4));
+}
+
+#[test]
+fn test_numeric_offsets_octal() {
+    let tokens = tokenize_with_offsets("010");
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(tokens[0], (TokenType::OCTAL_LITERAL, "010".to_string(), 0, 3));
+}
+
+#[test]
+fn test_numeric_offsets_leading_dot_float() {
+    let tokens = tokenize_with_offsets(".25");
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(tokens[0], (TokenType::DECIMAL_LITERAL, ".25".to_string(), 0, 3));
+}
+
+#[test]
+fn test_numeric_offsets_in_expression() {
+    let tokens = tokenize_with_offsets("0xA + 07");
+    assert_eq!(tokens.len(), 3);
+    assert_eq!(tokens[0], (TokenType::HEX_LITERAL, "0xA".to_string(), 0, 3));
+    assert_eq!(tokens[1], (TokenType::PLUS, "+".to_string(), 4, 5));
+    assert_eq!(tokens[2], (TokenType::OCTAL_LITERAL, "07".to_string(), 6, 8));
+}
+
+// ---------- Edge: lone zero is decimal, not octal ----------
+
+#[test]
+fn test_zero_is_decimal_not_octal() {
+    // Plain `0` (not followed by octal digit or 'x') stays DECIMAL_LITERAL
+    assert_tokens("0", &[(TokenType::DECIMAL_LITERAL, "0")]);
+}
+
+#[test]
+fn test_zero_before_dot_is_float() {
+    // `0.5` — the `0` is followed by `.`, not an octal digit, so decimal path handles it
+    assert_tokens("0.5", &[(TokenType::DECIMAL_LITERAL, "0.5")]);
+}
+
+#[test]
+fn test_zero_before_space_is_decimal() {
+    assert_tokens(
+        "0 + 1",
+        &[
+            (TokenType::DECIMAL_LITERAL, "0"),
+            (TokenType::PLUS, "+"),
+            (TokenType::DECIMAL_LITERAL, "1"),
+        ],
+    );
+}
+
 #[test]
 fn test_error_has_location_info() {
     let err = tokenize_err("@");
