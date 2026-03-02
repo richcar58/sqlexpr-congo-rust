@@ -362,7 +362,7 @@ fn test_like_with_escape() {
     let (p, root) = parse_ok("name LIKE '%x' ESCAPE '\\'");
     let n = skip(p.arena(), root);
     if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
-        assert_eq!(cmp.operators, vec![ComparisonOp::Like]);
+        assert_eq!(cmp.operators, vec![ComparisonOp::LikeEscape]);
         assert_eq!(cmp.children.len(), 3); // variable, pattern, escape char
     } else {
         panic!("expected ComparisonExpression");
@@ -386,7 +386,7 @@ fn test_not_like_with_escape() {
     let (p, root) = parse_ok("x NOT LIKE '%a' ESCAPE '!'");
     let n = skip(p.arena(), root);
     if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
-        assert_eq!(cmp.operators, vec![ComparisonOp::NotLike]);
+        assert_eq!(cmp.operators, vec![ComparisonOp::NotLikeEscape]);
         assert_eq!(cmp.children.len(), 3);
     } else {
         panic!("expected ComparisonExpression");
@@ -877,17 +877,9 @@ fn test_is_null_and_is_not_null_combined() {
 
 #[test]
 fn test_between_with_arithmetic_bounds() {
-    let (p, root) = parse_ok("x BETWEEN a + 1 AND b - 2");
-    let n = skip(p.arena(), root);
-    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
-        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
-        assert_eq!(cmp.children.len(), 3);
-        // Low bound is an AddExpression
-        let low = skip(p.arena(), cmp.children[1]);
-        assert!(matches!(p.arena().get_node(low), AstNode::AddExpression(_)));
-    } else {
-        panic!("expected ComparisonExpression");
-    }
+    // BETWEEN bounds must be literals, not expressions
+    let msg = parse_err("x BETWEEN a + 1 AND b - 2");
+    assert!(msg.contains("BETWEEN bounds must be literal values"), "msg was: {}", msg);
 }
 
 #[test]
@@ -1203,8 +1195,8 @@ fn test_err_in_unclosed() {
 #[test]
 fn test_err_in_empty_list() {
     let msg = parse_err("a IN ()");
-    // Expects at least one string literal inside parens
-    assert!(msg.contains("Expected") || msg.contains("STRING_LITERAL"), "msg was: {}", msg);
+    // Expects at least one literal value inside parens
+    assert!(msg.contains("IN list elements must be literal values") || msg.contains("Expected"), "msg was: {}", msg);
 }
 
 #[test]
@@ -1217,14 +1209,14 @@ fn test_err_between_missing_and() {
 #[test]
 fn test_err_between_missing_high() {
     let msg = parse_err("a BETWEEN 1 AND");
-    assert!(msg.contains("Expected expression"), "msg was: {}", msg);
+    assert!(msg.contains("BETWEEN bounds must be literal values") || msg.contains("Expected"), "msg was: {}", msg);
 }
 
 #[test]
 fn test_err_between_missing_low() {
-    // "a BETWEEN AND 10" - the AND is consumed as keyword
+    // "a BETWEEN AND 10" - AND is not a valid literal bound
     let msg = parse_err("a BETWEEN AND 10");
-    assert!(msg.contains("Expected expression") || msg.contains("Expected"), "msg was: {}", msg);
+    assert!(msg.contains("BETWEEN bounds must be literal values") || msg.contains("Expected"), "msg was: {}", msg);
 }
 
 #[test]
@@ -1288,4 +1280,147 @@ fn test_err_empty_parens() {
 fn test_err_mismatched_parens() {
     let msg = parse_err(")(");
     assert!(msg.contains("Expected expression") || msg.contains("Unexpected"), "msg was: {}", msg);
+}
+
+// ================================================================
+// POSITIVE TESTS: BETWEEN with literal bounds
+// ================================================================
+
+#[test]
+fn test_between_string_bounds() {
+    let (p, root) = parse_ok("x BETWEEN 'a' AND 'z'");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_float_bounds() {
+    let (p, root) = parse_ok("x BETWEEN 1.5 AND 9.5");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_between_mixed_int_float_bounds() {
+    // Integer and float mixing within numeric is OK
+    let (p, root) = parse_ok("x BETWEEN 1 AND 9.5");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::Between]);
+        assert_eq!(cmp.children.len(), 3);
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+// ================================================================
+// NEGATIVE TESTS: BETWEEN validation
+// ================================================================
+
+#[test]
+fn test_between_type_mismatch() {
+    let msg = parse_err("x BETWEEN 1 AND 'z'");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_between_bounds_ordering() {
+    let msg = parse_err("x BETWEEN 10 AND 1");
+    assert!(msg.contains("lower bound") && msg.contains("upper bound"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_between_boolean_bound() {
+    let msg = parse_err("x BETWEEN TRUE AND FALSE");
+    assert!(msg.contains("boolean"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_between_null_bound() {
+    let msg = parse_err("x BETWEEN NULL AND 10");
+    assert!(msg.contains("NULL"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_between_variable_bound() {
+    let msg = parse_err("x BETWEEN a AND b");
+    assert!(msg.contains("literal values"), "msg was: {}", msg);
+}
+
+// ================================================================
+// POSITIVE TESTS: IN with numeric literals
+// ================================================================
+
+#[test]
+fn test_in_integer_list() {
+    let (p, root) = parse_ok("x IN (1, 2, 3)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 4); // variable + 3 integers
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_in_float_list() {
+    let (p, root) = parse_ok("x IN (1.5, 2.5)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::In]);
+        assert_eq!(cmp.children.len(), 3); // variable + 2 floats
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+#[test]
+fn test_not_in_integer_list() {
+    let (p, root) = parse_ok("x NOT IN (10, 20)");
+    let n = skip(p.arena(), root);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        assert_eq!(cmp.operators, vec![ComparisonOp::NotIn]);
+        assert_eq!(cmp.children.len(), 3); // variable + 2 integers
+    } else {
+        panic!("expected ComparisonExpression");
+    }
+}
+
+// ================================================================
+// NEGATIVE TESTS: IN type checking
+// ================================================================
+
+#[test]
+fn test_in_mixed_types_error() {
+    let msg = parse_err("x IN (1, 'a')");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_boolean_error() {
+    let msg = parse_err("x IN (TRUE)");
+    assert!(msg.contains("boolean"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_null_error() {
+    let msg = parse_err("x IN (NULL)");
+    assert!(msg.contains("NULL"), "msg was: {}", msg);
+}
+
+#[test]
+fn test_in_int_float_mixed_error() {
+    let msg = parse_err("x IN (1, 2.5)");
+    assert!(msg.contains("same type"), "msg was: {}", msg);
 }

@@ -65,3 +65,4 @@ pub use arena::MultExprOp;
 pub use arena::EqualityOp;
 pub use arena::ComparisonOp;
 pub use arena::UnaryOp;
+pub use evaluator::{evaluate, RuntimeValue, EvalError};

@@ -175,6 +175,8 @@ impl Arena {
                             ComparisonOp::LessThanEqual => "<=",
                             ComparisonOp::Like => "LIKE",
                             ComparisonOp::NotLike => "NOT LIKE",
+                            ComparisonOp::LikeEscape => "LIKE ESCAPE",
+                            ComparisonOp::NotLikeEscape => "NOT LIKE ESCAPE",
                             ComparisonOp::Between => "BETWEEN",
                             ComparisonOp::NotBetween => "NOT BETWEEN",
                             ComparisonOp::In => "IN",
@@ -379,6 +381,10 @@ pub enum ComparisonOp {
     Like,
     /// NOT LIKE
     NotLike,
+    /// LIKE with ESCAPE clause
+    LikeEscape,
+    /// NOT LIKE with ESCAPE clause
+    NotLikeEscape,
     /// BETWEEN
     Between,
     /// NOT BETWEEN

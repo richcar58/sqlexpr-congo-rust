@@ -38,6 +38,14 @@ pub struct Parser {
     input: String,
 }
 
+/// Element type classification for IN lists
+#[derive(Debug, Clone, PartialEq)]
+enum InElementType {
+    Integer,
+    Float,
+    StringLit,
+}
+
 impl Parser {
     /// Create a new parser for the given input
     pub fn new(input: String) -> ParseResult<Self> {
@@ -250,7 +258,6 @@ impl Parser {
         }
         else if self.current_token.token_type == TokenType::LIKE
         {
-        operators.push(ComparisonOp::Like);
         self.expect_token(TokenType::LIKE)?;
         {
             let child = self.parse_string_litteral()?;
@@ -258,18 +265,20 @@ impl Parser {
         }
         if self.current_token.token_type == TokenType::ESCAPE
         {
+        operators.push(ComparisonOp::LikeEscape);
         self.expect_token(TokenType::ESCAPE)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
+        } else {
+        operators.push(ComparisonOp::Like);
         }
         }
         else if
             self.current_token.token_type == TokenType::NOT
             && self.lookahead_type(1) == Some(TokenType::LIKE)
         {
-        operators.push(ComparisonOp::NotLike);
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::LIKE)?;
         {
@@ -278,11 +287,14 @@ impl Parser {
         }
         if self.current_token.token_type == TokenType::ESCAPE
         {
+        operators.push(ComparisonOp::NotLikeEscape);
         self.expect_token(TokenType::ESCAPE)?;
         {
             let child = self.parse_string_litteral()?;
             children.push(child);
         }
+        } else {
+        operators.push(ComparisonOp::NotLike);
         }
         }
         else if self.current_token.token_type == TokenType::BETWEEN
@@ -290,14 +302,17 @@ impl Parser {
         operators.push(ComparisonOp::Between);
         self.expect_token(TokenType::BETWEEN)?;
         {
-            let child = self.parse_add_expression()?;
+            let child = self.parse_between_bound()?;
             children.push(child);
         }
         self.expect_token(TokenType::AND)?;
+        let low_id = *children.last().unwrap();
         {
-            let child = self.parse_add_expression()?;
+            let child = self.parse_between_bound()?;
             children.push(child);
         }
+        let high_id = *children.last().unwrap();
+        self.validate_between_bounds(low_id, high_id)?;
         }
         else if
             self.current_token.token_type == TokenType::NOT
@@ -307,29 +322,35 @@ impl Parser {
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::BETWEEN)?;
         {
-            let child = self.parse_add_expression()?;
+            let child = self.parse_between_bound()?;
             children.push(child);
         }
         self.expect_token(TokenType::AND)?;
+        let low_id = *children.last().unwrap();
         {
-            let child = self.parse_add_expression()?;
+            let child = self.parse_between_bound()?;
             children.push(child);
         }
+        let high_id = *children.last().unwrap();
+        self.validate_between_bounds(low_id, high_id)?;
         }
         else if self.current_token.token_type == TokenType::IN
         {
         operators.push(ComparisonOp::In);
         self.expect_token(TokenType::IN)?;
         self.expect_token(TokenType::LPAREN)?;
+        let first_type = self.classify_current_token_for_in()?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_in_element()?;
             children.push(child);
         }
         while self.current_token.token_type == TokenType::COMMA
         {
         self.expect_token(TokenType::COMMA)?;
+        let elem_type = self.classify_current_token_for_in()?;
+        self.check_in_type_consistency(&first_type, &elem_type)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_in_element()?;
             children.push(child);
         }
         }
@@ -344,15 +365,18 @@ impl Parser {
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::IN)?;
         self.expect_token(TokenType::LPAREN)?;
+        let first_type = self.classify_current_token_for_in()?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_in_element()?;
             children.push(child);
         }
         while self.current_token.token_type == TokenType::COMMA
         {
         self.expect_token(TokenType::COMMA)?;
+        let elem_type = self.classify_current_token_for_in()?;
+        self.check_in_type_consistency(&first_type, &elem_type)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_in_element()?;
             children.push(child);
         }
         }
@@ -641,6 +665,215 @@ impl Parser {
             self.set_parent(child_id, node_id);
         }
         Ok(node_id)
+    }
+
+    // ========== BETWEEN / IN Helper Methods ==========
+
+    /// Parse a BETWEEN bound: only accepts DECIMAL_LITERAL or STRING_LITERAL.
+    fn parse_between_bound(&mut self) -> ParseResult<NodeId> {
+        match self.current_token.token_type {
+            TokenType::DECIMAL_LITERAL | TokenType::STRING_LITERAL => {
+                self.parse_primary_expr()
+            }
+            TokenType::TRUE | TokenType::FALSE => {
+                Err(ParseError::at_position(
+                    "BETWEEN bounds cannot be boolean values".to_string(),
+                    self.current_token.begin_offset,
+                ))
+            }
+            TokenType::NULL => {
+                Err(ParseError::at_position(
+                    "BETWEEN bounds cannot be NULL".to_string(),
+                    self.current_token.begin_offset,
+                ))
+            }
+            TokenType::ID => {
+                Err(ParseError::at_position(
+                    "BETWEEN bounds must be literal values, not variables".to_string(),
+                    self.current_token.begin_offset,
+                ))
+            }
+            _ => {
+                Err(ParseError::at_position(
+                    format!(
+                        "BETWEEN bounds must be literal values (numeric or string), found {:?} '{}'",
+                        self.current_token.token_type, self.current_token.image
+                    ),
+                    self.current_token.begin_offset,
+                ))
+            }
+        }
+    }
+
+    /// Get the token image for a literal node, navigating through PrimaryExpr → Literal → StringLitteral.
+    fn get_literal_image(&self, node_id: NodeId) -> String {
+        match self.arena.get_node(node_id) {
+            AstNode::PrimaryExpr(n) => {
+                if n.children.is_empty() {
+                    self.arena.get_token(n.begin_token).image.clone()
+                } else {
+                    self.get_literal_image(n.children[0])
+                }
+            }
+            AstNode::Literal(n) => {
+                if n.children.is_empty() {
+                    self.arena.get_token(n.begin_token).image.clone()
+                } else {
+                    self.get_literal_image(n.children[0])
+                }
+            }
+            AstNode::StringLitteral(n) => {
+                self.arena.get_token(n.begin_token).image.clone()
+            }
+            _ => String::new(),
+        }
+    }
+
+    /// Get the token type for a literal node.
+    fn get_literal_token_type(&self, node_id: NodeId) -> TokenType {
+        match self.arena.get_node(node_id) {
+            AstNode::PrimaryExpr(n) => {
+                if n.children.is_empty() {
+                    self.arena.get_token(n.begin_token).token_type
+                } else {
+                    self.get_literal_token_type(n.children[0])
+                }
+            }
+            AstNode::Literal(n) => {
+                if n.children.is_empty() {
+                    self.arena.get_token(n.begin_token).token_type
+                } else {
+                    self.get_literal_token_type(n.children[0])
+                }
+            }
+            AstNode::StringLitteral(_) => TokenType::STRING_LITERAL,
+            _ => TokenType::INVALID,
+        }
+    }
+
+    /// Validate BETWEEN bounds: same type category and lower <= upper.
+    fn validate_between_bounds(&self, low_id: NodeId, high_id: NodeId) -> ParseResult<()> {
+        let low_image = self.get_literal_image(low_id);
+        let high_image = self.get_literal_image(high_id);
+        let low_type = self.get_literal_token_type(low_id);
+        let high_type = self.get_literal_token_type(high_id);
+
+        let low_is_numeric = low_type == TokenType::DECIMAL_LITERAL;
+        let high_is_numeric = high_type == TokenType::DECIMAL_LITERAL;
+        let low_is_string = low_type == TokenType::STRING_LITERAL;
+        let high_is_string = high_type == TokenType::STRING_LITERAL;
+
+        if low_is_numeric && high_is_string || low_is_string && high_is_numeric {
+            return Err(ParseError::new(format!(
+                "BETWEEN bounds must be the same type: cannot mix numeric and string ('{}' AND '{}')",
+                low_image, high_image
+            )));
+        }
+
+        if low_is_numeric && high_is_numeric {
+            let low_val: f64 = low_image.parse().map_err(|_| {
+                ParseError::new(format!("Invalid numeric literal in BETWEEN: '{}'", low_image))
+            })?;
+            let high_val: f64 = high_image.parse().map_err(|_| {
+                ParseError::new(format!("Invalid numeric literal in BETWEEN: '{}'", high_image))
+            })?;
+            if low_val > high_val {
+                return Err(ParseError::new(format!(
+                    "BETWEEN lower bound ({}) must not exceed upper bound ({})",
+                    low_image, high_image
+                )));
+            }
+        } else if low_is_string && high_is_string {
+            // Strip quotes for comparison
+            let low_inner = &low_image[1..low_image.len() - 1];
+            let high_inner = &high_image[1..high_image.len() - 1];
+            if low_inner > high_inner {
+                return Err(ParseError::new(format!(
+                    "BETWEEN lower bound ({}) must not exceed upper bound ({})",
+                    low_image, high_image
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Classify current token for IN list element type checking.
+    fn classify_current_token_for_in(&self) -> ParseResult<InElementType> {
+        match self.current_token.token_type {
+            TokenType::STRING_LITERAL => Ok(InElementType::StringLit),
+            TokenType::DECIMAL_LITERAL => {
+                if self.current_token.image.contains('.') {
+                    Ok(InElementType::Float)
+                } else {
+                    Ok(InElementType::Integer)
+                }
+            }
+            TokenType::TRUE | TokenType::FALSE => {
+                Err(ParseError::at_position(
+                    "IN list elements cannot be boolean values".to_string(),
+                    self.current_token.begin_offset,
+                ))
+            }
+            TokenType::NULL => {
+                Err(ParseError::at_position(
+                    "IN list elements cannot be NULL".to_string(),
+                    self.current_token.begin_offset,
+                ))
+            }
+            _ => {
+                Err(ParseError::at_position(
+                    format!(
+                        "IN list elements must be literal values (string, integer, or float), found {:?} '{}'",
+                        self.current_token.token_type, self.current_token.image
+                    ),
+                    self.current_token.begin_offset,
+                ))
+            }
+        }
+    }
+
+    /// Check that an IN element type is consistent with the first element's type.
+    fn check_in_type_consistency(&self, first: &InElementType, current: &InElementType) -> ParseResult<()> {
+        let compatible = match (first, current) {
+            (InElementType::StringLit, InElementType::StringLit) => true,
+            (InElementType::Integer, InElementType::Integer) => true,
+            (InElementType::Float, InElementType::Float) => true,
+            (InElementType::Integer, InElementType::Float)
+            | (InElementType::Float, InElementType::Integer) => false,
+            _ => false,
+        };
+        if !compatible {
+            Err(ParseError::at_position(
+                format!(
+                    "IN list elements must all be the same type: first element is {:?}, but found {:?} '{}'",
+                    first, current, self.current_token.image
+                ),
+                self.current_token.begin_offset,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Parse an IN list element: STRING_LITERAL or DECIMAL_LITERAL.
+    fn parse_in_element(&mut self) -> ParseResult<NodeId> {
+        match self.current_token.token_type {
+            TokenType::STRING_LITERAL => self.parse_string_litteral(),
+            TokenType::DECIMAL_LITERAL => {
+                // Parse as a literal (produces PrimaryExpr -> Literal)
+                self.parse_primary_expr()
+            }
+            _ => {
+                Err(ParseError::at_position(
+                    format!(
+                        "Expected literal value in IN list, found {:?} '{}'",
+                        self.current_token.token_type, self.current_token.image
+                    ),
+                    self.current_token.begin_offset,
+                ))
+            }
+        }
     }
 
     // ========== Helper Methods ==========
