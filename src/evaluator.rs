@@ -253,6 +253,10 @@ impl<'a> Evaluator<'a> {
 
     fn eval_or(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let children = self.get_children(node_id);
+        // Single child: pass-through (no OR operator present)
+        if children.len() == 1 {
+            return self.eval_node(children[0]);
+        }
         for child_id in &children {
             let val = self.eval_node(*child_id)?;
             match val {
@@ -273,6 +277,10 @@ impl<'a> Evaluator<'a> {
 
     fn eval_and(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let children = self.get_children(node_id);
+        // Single child: pass-through (no AND operator present)
+        if children.len() == 1 {
+            return self.eval_node(children[0]);
+        }
         for child_id in &children {
             let val = self.eval_node(*child_id)?;
             match val {
@@ -305,12 +313,12 @@ impl<'a> Evaluator<'a> {
                 EqualityOp::Equal => {
                     let right = self.eval_node(children[child_idx])?;
                     child_idx += 1;
-                    current = self.eval_eq_values(&current, &right, "=")?;
+                    current = self.eval_eq_values(&current, &right, "Equal")?;
                 }
                 EqualityOp::NotEqual => {
                     let right = self.eval_node(children[child_idx])?;
                     child_idx += 1;
-                    let eq_result = self.eval_eq_values(&current, &right, "<>")?;
+                    let eq_result = self.eval_eq_values(&current, &right, "NotEqual")?;
                     current = match eq_result {
                         EvalValue::Bool(b) => EvalValue::Bool(!b),
                         _ => unreachable!(),
@@ -463,11 +471,11 @@ impl<'a> Evaluator<'a> {
                     EvalValue::Integer(i) => Ok(EvalValue::Integer(-i)),
                     EvalValue::Float(f) => Ok(EvalValue::Float(-f)),
                     EvalValue::Null => Err(EvalError::NullInOperation {
-                        operation: "unary -".to_string(),
+                        operation: "unary minus".to_string(),
                         context: self.input().to_string(),
                     }),
                     _ => Err(EvalError::TypeError {
-                        operation: "unary -".to_string(),
+                        operation: "unary minus".to_string(),
                         expected: "numeric".to_string(),
                         actual: child_val.type_name().to_string(),
                         context: self.input().to_string(),
@@ -530,6 +538,30 @@ impl<'a> Evaluator<'a> {
                     })?;
                     Ok(EvalValue::Integer(i))
                 }
+            }
+            TokenType::HEX_LITERAL => {
+                let hex_str = image.strip_prefix("0x")
+                    .or_else(|| image.strip_prefix("0X"))
+                    .unwrap_or(image);
+                let i = i64::from_str_radix(hex_str, 16).map_err(|e| {
+                    EvalError::InvalidLiteral {
+                        literal: image.clone(),
+                        literal_type: "hex".to_string(),
+                        error: e.to_string(),
+                    }
+                })?;
+                Ok(EvalValue::Integer(i))
+            }
+            TokenType::OCTAL_LITERAL => {
+                let oct_str = image.strip_prefix('0').unwrap_or(image);
+                let i = i64::from_str_radix(oct_str, 8).map_err(|e| {
+                    EvalError::InvalidLiteral {
+                        literal: image.clone(),
+                        literal_type: "octal".to_string(),
+                        error: e.to_string(),
+                    }
+                })?;
+                Ok(EvalValue::Integer(i))
             }
             _ => Err(EvalError::InvalidLiteral {
                 literal: image.clone(),
@@ -598,10 +630,10 @@ impl<'a> Evaluator<'a> {
 
     fn eval_ordering_comparison(&self, left: &EvalValue, right: &EvalValue, op: ComparisonOp) -> Result<EvalValue, EvalError> {
         let op_name = match op {
-            ComparisonOp::GreaterThan => ">",
-            ComparisonOp::GreaterThanEqual => ">=",
-            ComparisonOp::LessThan => "<",
-            ComparisonOp::LessThanEqual => "<=",
+            ComparisonOp::GreaterThan => "GreaterThan",
+            ComparisonOp::GreaterThanEqual => "GreaterThanEqual",
+            ComparisonOp::LessThan => "LessThan",
+            ComparisonOp::LessThanEqual => "LessThanEqual",
             _ => unreachable!(),
         };
 
@@ -638,8 +670,8 @@ impl<'a> Evaluator<'a> {
 
     fn eval_arithmetic_add(&self, left: &EvalValue, right: &EvalValue, op: AddOp) -> Result<EvalValue, EvalError> {
         let op_name = match op {
-            AddOp::Plus => "+",
-            AddOp::Minus => "-",
+            AddOp::Plus => "addition",
+            AddOp::Minus => "subtraction",
         };
 
         match (left, right) {
@@ -794,6 +826,18 @@ impl<'a> Evaluator<'a> {
     }
 
     fn eval_between(&self, value: &EvalValue, low: &EvalValue, high: &EvalValue, op: ComparisonOp) -> Result<EvalValue, EvalError> {
+        let between_name = match op {
+            ComparisonOp::Between => "BETWEEN",
+            ComparisonOp::NotBetween => "NOT BETWEEN",
+            _ => unreachable!(),
+        };
+        // Check for NULL at the BETWEEN level so the error names the right operation
+        if matches!(value, EvalValue::Null) || matches!(low, EvalValue::Null) || matches!(high, EvalValue::Null) {
+            return Err(EvalError::NullInOperation {
+                operation: between_name.to_string(),
+                context: self.input().to_string(),
+            });
+        }
         // low <= value AND value <= high
         let ge_low = self.eval_ordering_comparison(value, low, ComparisonOp::GreaterThanEqual)?;
         let le_high = self.eval_ordering_comparison(value, high, ComparisonOp::LessThanEqual)?;
@@ -811,6 +855,19 @@ impl<'a> Evaluator<'a> {
     }
 
     fn eval_in(&self, value: &EvalValue, elements: &[EvalValue], op: ComparisonOp) -> Result<EvalValue, EvalError> {
+        // Check that the value type is compatible with the list element type.
+        // Null is handled by eval_eq_values (produces NullInOperation).
+        // Integer and Float are compatible (numeric coercion).
+        if let Some(first) = elements.first() {
+            if !matches!(value, EvalValue::Null) && !Self::in_types_compatible(value, first) {
+                return Err(EvalError::TypeError {
+                    operation: "IN".to_string(),
+                    expected: first.type_name().to_string(),
+                    actual: value.type_name().to_string(),
+                    context: self.input().to_string(),
+                });
+            }
+        }
         for elem in elements {
             let eq = self.eval_eq_values(value, elem, "IN")?;
             if eq == EvalValue::Bool(true) {
@@ -862,6 +919,20 @@ impl<'a> Evaluator<'a> {
     // ========================================================================
     // UTILITY
     // ========================================================================
+
+    /// Check if a value type is compatible with an IN list element type.
+    /// Integer and Float are mutually compatible (numeric coercion).
+    fn in_types_compatible(a: &EvalValue, b: &EvalValue) -> bool {
+        match (a, b) {
+            (EvalValue::Integer(_), EvalValue::Integer(_)) => true,
+            (EvalValue::Float(_), EvalValue::Float(_)) => true,
+            (EvalValue::Integer(_), EvalValue::Float(_)) => true,
+            (EvalValue::Float(_), EvalValue::Integer(_)) => true,
+            (EvalValue::Str(_), EvalValue::Str(_)) => true,
+            (EvalValue::Bool(_), EvalValue::Bool(_)) => true,
+            _ => false,
+        }
+    }
 
     fn get_children(&self, node_id: NodeId) -> Vec<NodeId> {
         match self.arena().get_node(node_id) {

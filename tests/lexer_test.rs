@@ -249,7 +249,7 @@ fn test_integer_literals() {
     assert_tokens("1", &[(TokenType::DECIMAL_LITERAL, "1")]);
     assert_tokens("42", &[(TokenType::DECIMAL_LITERAL, "42")]);
     assert_tokens("12345", &[(TokenType::DECIMAL_LITERAL, "12345")]);
-    assert_tokens("00", &[(TokenType::DECIMAL_LITERAL, "00")]);
+    assert_tokens("00", &[(TokenType::OCTAL_LITERAL, "00")]);
 }
 
 #[test]

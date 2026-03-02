@@ -243,8 +243,10 @@ impl Lexer {
             return self.match_string_literal(start_pos);
         }
 
-        // Numeric literals
-        if ch.is_ascii_digit() {
+        // Numeric literals (including leading-dot floats like .5)
+        if ch.is_ascii_digit()
+            || (ch == '.' && self.peek(1).is_some_and(|c| c.is_ascii_digit()))
+        {
             return self.match_number(start_pos);
         }
 
@@ -290,8 +292,47 @@ impl Lexer {
         ))
     }
 
-    /// Match a numeric literal (integer or decimal)
+    /// Match a numeric literal (integer, hex, octal, or decimal/float)
     fn match_number(&mut self, start_pos: usize) -> ParseResult<Option<Token>> {
+        // Check for hex (0x/0X) or octal (leading 0 + digits) prefix
+        if self.current_char() == '0' {
+            if self.peek(1).is_some_and(|ch| ch == 'x' || ch == 'X') {
+                // Hex literal: 0x followed by hex digits
+                self.advance(); // consume '0'
+                self.advance(); // consume 'x'/'X'
+                if self.position >= self.input.len() || !self.current_char().is_ascii_hexdigit() {
+                    return Err(ParseError::at_position(
+                        "Expected hex digit after 0x".to_string(),
+                        start_pos,
+                    ));
+                }
+                while self.position < self.input.len() && self.current_char().is_ascii_hexdigit() {
+                    self.advance();
+                }
+                let image = self.input[start_pos..self.position].to_string();
+                return Ok(Some(Token::new(
+                    TokenType::HEX_LITERAL,
+                    image,
+                    start_pos,
+                    self.position,
+                )));
+            }
+            if self.peek(1).is_some_and(|ch| ('0'..='7').contains(&ch)) {
+                // Octal literal: 0 followed by octal digits
+                self.advance(); // consume leading '0'
+                while self.position < self.input.len() && ('0'..='7').contains(&self.current_char()) {
+                    self.advance();
+                }
+                let image = self.input[start_pos..self.position].to_string();
+                return Ok(Some(Token::new(
+                    TokenType::OCTAL_LITERAL,
+                    image,
+                    start_pos,
+                    self.position,
+                )));
+            }
+        }
+
         // Consume leading digits
         while self.position < self.input.len() && self.current_char().is_ascii_digit() {
             self.advance();
