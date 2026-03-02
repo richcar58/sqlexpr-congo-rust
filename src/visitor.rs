@@ -48,7 +48,7 @@ impl Arena {
             AstNode::UnaryExpr(n) => n.children.clone(),
             AstNode::PrimaryExpr(n) => n.children.clone(),
             AstNode::Literal(n) => n.children.clone(),
-            AstNode::StringLitteral(n) => n.children.clone(),
+            AstNode::StringLiteral(n) => n.children.clone(),
             AstNode::Variable(n) => n.children.clone(),
         };
         match f(node_id, node, self, depth, options) {

@@ -63,7 +63,7 @@ fn get_children(arena: &Arena, id: NodeId) -> Vec<NodeId> {
         AstNode::UnaryExpr(n) => n.children.clone(),
         AstNode::PrimaryExpr(n) => n.children.clone(),
         AstNode::Literal(n) => n.children.clone(),
-        AstNode::StringLitteral(n) => n.children.clone(),
+        AstNode::StringLiteral(n) => n.children.clone(),
         AstNode::Variable(n) => n.children.clone(),
     }
 }
@@ -74,7 +74,7 @@ fn leaf_image(arena: &Arena, id: NodeId) -> String {
     match arena.get_node(id) {
         AstNode::Variable(n) => arena.get_token(n.begin_token).image.clone(),
         AstNode::Literal(n) => arena.get_token(n.begin_token).image.clone(),
-        AstNode::StringLitteral(n) => arena.get_token(n.begin_token).image.clone(),
+        AstNode::StringLiteral(n) => arena.get_token(n.begin_token).image.clone(),
         AstNode::PrimaryExpr(n) => {
             if n.children.is_empty() {
                 arena.get_token(n.begin_token).image.clone()

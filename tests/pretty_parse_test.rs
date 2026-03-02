@@ -96,7 +96,7 @@ AST: \"a >= 1 AND b <= 5 AND NOT c = FALSE\"
 }
 
 #[test]
-fn test_like_not_like_string_litteral() {
+fn test_like_not_like_string_literal() {
     assert_pretty_print(
         "a LIKE '%foo' OR b NOT LIKE '%bar' AND c > 1",
         "\
@@ -105,12 +105,12 @@ AST: \"a LIKE '%foo' OR b NOT LIKE '%bar' AND c > 1\"
     ComparisonExpression [LIKE]
       PrimaryExpr
         Variable(\"a\")
-      StringLitteral(\"'%foo'\")
+      StringLiteral(\"'%foo'\")
     AndExpression [AND x1]
       ComparisonExpression [NOT LIKE]
         PrimaryExpr
           Variable(\"b\")
-        StringLitteral(\"'%bar'\")
+        StringLiteral(\"'%bar'\")
       ComparisonExpression [>]
         PrimaryExpr
           Variable(\"c\")
@@ -162,12 +162,12 @@ AST: \"a IN ('x', 'y') AND b NOT IN ('z') OR c <> 1\"
       ComparisonExpression [IN]
         PrimaryExpr
           Variable(\"a\")
-        StringLitteral(\"'x'\")
-        StringLitteral(\"'y'\")
+        StringLiteral(\"'x'\")
+        StringLiteral(\"'y'\")
       ComparisonExpression [NOT IN]
         PrimaryExpr
           Variable(\"b\")
-        StringLitteral(\"'z'\")
+        StringLiteral(\"'z'\")
     EqualityExpression [<>]
       PrimaryExpr
         Variable(\"c\")

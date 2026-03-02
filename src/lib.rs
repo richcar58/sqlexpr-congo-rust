@@ -58,7 +58,7 @@ pub use arena::MultExprNode;
 pub use arena::UnaryExprNode;
 pub use arena::PrimaryExprNode;
 pub use arena::LiteralNode;
-pub use arena::StringLitteralNode;
+pub use arena::StringLiteralNode;
 pub use arena::VariableNode;
 pub use arena::AddOp;
 pub use arena::MultExprOp;

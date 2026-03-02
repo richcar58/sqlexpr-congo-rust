@@ -237,7 +237,7 @@ impl<'a> Evaluator<'a> {
             AstNode::UnaryExpr(_) => self.eval_unary(node_id),
             AstNode::PrimaryExpr(_) => self.eval_primary(node_id),
             AstNode::Literal(_) => self.eval_literal(node_id),
-            AstNode::StringLitteral(_) => self.eval_string_literal(node_id),
+            AstNode::StringLiteral(_) => self.eval_string_literal(node_id),
             AstNode::Variable(_) => self.eval_variable(node_id),
         }
     }
@@ -500,7 +500,7 @@ impl<'a> Evaluator<'a> {
         };
 
         if !node.children.is_empty() {
-            // Has StringLitteral child
+            // Has StringLiteral child
             return self.eval_node(node.children[0]);
         }
 
@@ -541,7 +541,7 @@ impl<'a> Evaluator<'a> {
 
     fn eval_string_literal(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let node = match self.arena().get_node(node_id) {
-            AstNode::StringLitteral(n) => n.clone(),
+            AstNode::StringLiteral(n) => n.clone(),
             _ => unreachable!(),
         };
 
@@ -875,7 +875,7 @@ impl<'a> Evaluator<'a> {
             AstNode::UnaryExpr(n) => n.children.clone(),
             AstNode::PrimaryExpr(n) => n.children.clone(),
             AstNode::Literal(n) => n.children.clone(),
-            AstNode::StringLitteral(n) => n.children.clone(),
+            AstNode::StringLiteral(n) => n.children.clone(),
             AstNode::Variable(n) => n.children.clone(),
         }
     }

@@ -32,7 +32,7 @@ The parser is a hand-written recursive-descent parser generated from a CongoCC g
 
 ### AST Expression Hierarchy (precedence low to high)
 
-`JmsSelector` -> `OrExpression` -> `AndExpression` -> `EqualityExpression` -> `ComparisonExpression` -> `AddExpression` -> `MultExpr` -> `UnaryExpr` -> `PrimaryExpr` -> `Literal` | `Variable` | `StringLitteral`
+`JmsSelector` -> `OrExpression` -> `AndExpression` -> `EqualityExpression` -> `ComparisonExpression` -> `AddExpression` -> `MultExpr` -> `UnaryExpr` -> `PrimaryExpr` -> `Literal` | `Variable` | `StringLiteral`
 
 ### Usage Pattern
 

@@ -79,7 +79,7 @@ impl Arena {
             AstNode::UnaryExpr(n) => n.children.len() == 1 && n.operator.is_none(),
             AstNode::PrimaryExpr(_) => false,
             AstNode::Literal(_) => false,
-            AstNode::StringLitteral(n) => n.children.len() == 1,
+            AstNode::StringLiteral(n) => n.children.len() == 1,
             AstNode::Variable(n) => n.children.len() == 1,
         }
     }
@@ -97,7 +97,7 @@ impl Arena {
             AstNode::UnaryExpr(n) => n.children.first().copied(),
             AstNode::PrimaryExpr(n) => n.children.first().copied(),
             AstNode::Literal(n) => n.children.first().copied(),
-            AstNode::StringLitteral(n) => n.children.first().copied(),
+            AstNode::StringLiteral(n) => n.children.first().copied(),
             AstNode::Variable(n) => n.children.first().copied(),
         }
     }
@@ -267,12 +267,12 @@ impl Arena {
                     }
                 }
             }
-            AstNode::StringLitteral(node) => {
+            AstNode::StringLiteral(node) => {
                 if node.children.is_empty() {
                     let value = &self.get_token(node.begin_token).image;
-                    result.push_str(&format!("{}StringLitteral(\"{}\")\n", indent_str, value));
+                    result.push_str(&format!("{}StringLiteral(\"{}\")\n", indent_str, value));
                 } else {
-                    result.push_str(&format!("{}StringLitteral\n", indent_str));
+                    result.push_str(&format!("{}StringLiteral\n", indent_str));
                     for child in &node.children {
                         self.pretty_print_impl(*child, indent + 1, result);
                     }
@@ -323,8 +323,8 @@ pub enum AstNode {
     PrimaryExpr(PrimaryExprNode),
     /// AST node: literal
     Literal(LiteralNode),
-    /// AST node: stringLitteral
-    StringLitteral(StringLitteralNode),
+    /// AST node: stringLiteral
+    StringLiteral(StringLiteralNode),
     /// AST node: variable
     Variable(VariableNode),
 }
@@ -748,10 +748,10 @@ impl LiteralNode {
     }
 }
 
-/// AST node for stringLitteral production
+/// AST node for stringLiteral production
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct StringLitteralNode {
+pub struct StringLiteralNode {
     /// Parent node (if any)
     pub parent: Option<NodeId>,
     /// Child nodes
@@ -762,10 +762,10 @@ pub struct StringLitteralNode {
     pub end_token: TokenId,
 }
 
-impl StringLitteralNode {
-    /// Create a new stringLitteral node
+impl StringLiteralNode {
+    /// Create a new stringLiteral node
     pub fn new(begin_token: TokenId, end_token: TokenId) -> Self {
-        StringLitteralNode {
+        StringLiteralNode {
             parent: None,
             children: Vec::new(),
             begin_token,

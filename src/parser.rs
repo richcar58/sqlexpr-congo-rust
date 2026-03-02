@@ -18,7 +18,7 @@ use crate::arena::{
     UnaryExprNode,
     PrimaryExprNode,
     LiteralNode,
-    StringLitteralNode,
+    StringLiteralNode,
     VariableNode
 };
 
@@ -260,7 +260,7 @@ impl Parser {
         {
         self.expect_token(TokenType::LIKE)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_string_literal()?;
             children.push(child);
         }
         if self.current_token.token_type == TokenType::ESCAPE
@@ -268,7 +268,7 @@ impl Parser {
         operators.push(ComparisonOp::LikeEscape);
         self.expect_token(TokenType::ESCAPE)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_string_literal()?;
             children.push(child);
         }
         } else {
@@ -282,7 +282,7 @@ impl Parser {
         self.expect_token(TokenType::NOT)?;
         self.expect_token(TokenType::LIKE)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_string_literal()?;
             children.push(child);
         }
         if self.current_token.token_type == TokenType::ESCAPE
@@ -290,7 +290,7 @@ impl Parser {
         operators.push(ComparisonOp::NotLikeEscape);
         self.expect_token(TokenType::ESCAPE)?;
         {
-            let child = self.parse_string_litteral()?;
+            let child = self.parse_string_literal()?;
             children.push(child);
         }
         } else {
@@ -599,7 +599,7 @@ impl Parser {
 
         if self.current_token.token_type == TokenType::STRING_LITERAL
         {
-            let inner = self.parse_string_litteral()?;
+            let inner = self.parse_string_literal()?;
             children.push(inner);
         }
         else if self.current_token.token_type == TokenType::DECIMAL_LITERAL
@@ -633,17 +633,17 @@ impl Parser {
         Ok(node_id)
     }
 
-    /// Parse: stringLitteral (generic)
-    fn parse_string_litteral(&mut self) -> ParseResult<NodeId> {
+    /// Parse: stringLiteral (generic)
+    fn parse_string_literal(&mut self) -> ParseResult<NodeId> {
         let begin_token = self.alloc_current_token();
         let children: Vec<NodeId> = Vec::new();
 
         self.expect_token(TokenType::STRING_LITERAL)?;
 
         let end_token = self.current_token_id.unwrap_or(begin_token);
-        let mut node = StringLitteralNode::new(begin_token, end_token);
+        let mut node = StringLiteralNode::new(begin_token, end_token);
         node.children = children.clone();
-        let node_id = self.arena.alloc_node(AstNode::StringLitteral(node));
+        let node_id = self.arena.alloc_node(AstNode::StringLiteral(node));
         for child_id in children {
             self.set_parent(child_id, node_id);
         }
@@ -705,7 +705,7 @@ impl Parser {
         }
     }
 
-    /// Get the token image for a literal node, navigating through PrimaryExpr → Literal → StringLitteral.
+    /// Get the token image for a literal node, navigating through PrimaryExpr → Literal → StringLiteral.
     fn get_literal_image(&self, node_id: NodeId) -> String {
         match self.arena.get_node(node_id) {
             AstNode::PrimaryExpr(n) => {
@@ -722,7 +722,7 @@ impl Parser {
                     self.get_literal_image(n.children[0])
                 }
             }
-            AstNode::StringLitteral(n) => {
+            AstNode::StringLiteral(n) => {
                 self.arena.get_token(n.begin_token).image.clone()
             }
             _ => String::new(),
@@ -746,7 +746,7 @@ impl Parser {
                     self.get_literal_token_type(n.children[0])
                 }
             }
-            AstNode::StringLitteral(_) => TokenType::STRING_LITERAL,
+            AstNode::StringLiteral(_) => TokenType::STRING_LITERAL,
             _ => TokenType::INVALID,
         }
     }
@@ -859,7 +859,7 @@ impl Parser {
     /// Parse an IN list element: STRING_LITERAL or DECIMAL_LITERAL.
     fn parse_in_element(&mut self) -> ParseResult<NodeId> {
         match self.current_token.token_type {
-            TokenType::STRING_LITERAL => self.parse_string_litteral(),
+            TokenType::STRING_LITERAL => self.parse_string_literal(),
             TokenType::DECIMAL_LITERAL => {
                 // Parse as a literal (produces PrimaryExpr -> Literal)
                 self.parse_primary_expr()
@@ -891,7 +891,7 @@ impl Parser {
             AstNode::UnaryExpr(node) => node.parent = Some(parent_id),
             AstNode::PrimaryExpr(node) => node.parent = Some(parent_id),
             AstNode::Literal(node) => node.parent = Some(parent_id),
-            AstNode::StringLitteral(node) => node.parent = Some(parent_id),
+            AstNode::StringLiteral(node) => node.parent = Some(parent_id),
             AstNode::Variable(node) => node.parent = Some(parent_id),
         }
     }
