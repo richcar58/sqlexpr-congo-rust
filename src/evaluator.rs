@@ -885,8 +885,8 @@ impl<'a> Evaluator<'a> {
         // Check that the value type is compatible with the list element type.
         // Null is handled by eval_eq_values (produces NullInOperation).
         // Integer and Float are compatible (numeric coercion).
-        if let Some(first) = elements.first() {
-            if !matches!(value, EvalValue::Null) && !Self::in_types_compatible(value, first) {
+        if let Some(first) = elements.first()
+            && !matches!(value, EvalValue::Null) && !Self::in_types_compatible(value, first) {
                 return Err(EvalError::TypeError {
                     operation: "IN".to_string(),
                     expected: first.type_name().to_string(),
@@ -894,7 +894,6 @@ impl<'a> Evaluator<'a> {
                     context: self.input().to_string(),
                 });
             }
-        }
         for elem in elements {
             let eq = self.eval_eq_values(value, elem, "IN")?;
             if eq == EvalValue::Bool(true) {
@@ -958,15 +957,14 @@ impl<'a> Evaluator<'a> {
     /// Check if a value type is compatible with an IN list element type.
     /// Integer and Float are mutually compatible (numeric coercion).
     fn in_types_compatible(a: &EvalValue, b: &EvalValue) -> bool {
-        match (a, b) {
-            (EvalValue::Integer(_), EvalValue::Integer(_)) => true,
-            (EvalValue::Float(_), EvalValue::Float(_)) => true,
-            (EvalValue::Integer(_), EvalValue::Float(_)) => true,
-            (EvalValue::Float(_), EvalValue::Integer(_)) => true,
-            (EvalValue::Str(_), EvalValue::Str(_)) => true,
-            (EvalValue::Bool(_), EvalValue::Bool(_)) => true,
-            _ => false,
-        }
+        matches!((a, b),
+            (EvalValue::Integer(_), EvalValue::Integer(_))
+            | (EvalValue::Float(_), EvalValue::Float(_))
+            | (EvalValue::Integer(_), EvalValue::Float(_))
+            | (EvalValue::Float(_), EvalValue::Integer(_))
+            | (EvalValue::Str(_), EvalValue::Str(_))
+            | (EvalValue::Bool(_), EvalValue::Bool(_))
+        )
     }
 
     fn get_children(&self, node_id: NodeId) -> Vec<NodeId> {
