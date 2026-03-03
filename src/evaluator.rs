@@ -302,7 +302,9 @@ impl<'a> Evaluator<'a> {
     fn eval_equality(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let (children, operators) = match self.arena().get_node(node_id) {
             AstNode::EqualityExpression(n) => (n.children.clone(), n.operators.clone()),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected EqualityExpression node, found {:?}", other),
+            )),
         };
 
         let mut current = self.eval_node(children[0])?;
@@ -321,7 +323,9 @@ impl<'a> Evaluator<'a> {
                     let eq_result = self.eval_eq_values(&current, &right, "NotEqual")?;
                     current = match eq_result {
                         EvalValue::Bool(b) => EvalValue::Bool(!b),
-                        _ => unreachable!(),
+                        other => return Err(EvalError::EvalParseError(
+                            format!("Internal error: equality comparison returned non-boolean {:?}", other.type_name()),
+                        )),
                     };
                 }
                 EqualityOp::IsNull => {
@@ -339,7 +343,9 @@ impl<'a> Evaluator<'a> {
     fn eval_comparison(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let (children, operators) = match self.arena().get_node(node_id) {
             AstNode::ComparisonExpression(n) => (n.children.clone(), n.operators.clone()),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected ComparisonExpression node, found {:?}", other),
+            )),
         };
 
         let mut current = self.eval_node(children[0])?;
@@ -417,7 +423,9 @@ impl<'a> Evaluator<'a> {
     fn eval_add(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let (children, operators) = match self.arena().get_node(node_id) {
             AstNode::AddExpression(n) => (n.children.clone(), n.operators.clone()),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected AddExpression node, found {:?}", other),
+            )),
         };
 
         let mut result = self.eval_node(children[0])?;
@@ -431,7 +439,9 @@ impl<'a> Evaluator<'a> {
     fn eval_mult(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let (children, operators) = match self.arena().get_node(node_id) {
             AstNode::MultExpr(n) => (n.children.clone(), n.operators.clone()),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected MultExpr node, found {:?}", other),
+            )),
         };
 
         let mut result = self.eval_node(children[0])?;
@@ -445,7 +455,9 @@ impl<'a> Evaluator<'a> {
     fn eval_unary(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let (children, operator) = match self.arena().get_node(node_id) {
             AstNode::UnaryExpr(n) => (n.children.clone(), n.operator),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected UnaryExpr node, found {:?}", other),
+            )),
         };
 
         let child_val = self.eval_node(children[0])?;
@@ -504,7 +516,9 @@ impl<'a> Evaluator<'a> {
     fn eval_literal(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let node = match self.arena().get_node(node_id) {
             AstNode::Literal(n) => n.clone(),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected Literal node, found {:?}", other),
+            )),
         };
 
         if !node.children.is_empty() {
@@ -574,7 +588,9 @@ impl<'a> Evaluator<'a> {
     fn eval_string_literal(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let node = match self.arena().get_node(node_id) {
             AstNode::StringLiteral(n) => n.clone(),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected StringLiteral node, found {:?}", other),
+            )),
         };
 
         let token = self.arena().get_token(node.begin_token);
@@ -587,7 +603,9 @@ impl<'a> Evaluator<'a> {
     fn eval_variable(&self, node_id: NodeId) -> Result<EvalValue, EvalError> {
         let node = match self.arena().get_node(node_id) {
             AstNode::Variable(n) => n.clone(),
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: expected Variable node, found {:?}", other),
+            )),
         };
 
         let token = self.arena().get_token(node.begin_token);
@@ -634,7 +652,9 @@ impl<'a> Evaluator<'a> {
             ComparisonOp::GreaterThanEqual => "GreaterThanEqual",
             ComparisonOp::LessThan => "LessThan",
             ComparisonOp::LessThanEqual => "LessThanEqual",
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: unexpected operator {:?} in ordering comparison", other),
+            )),
         };
 
         match (left, right) {
@@ -645,19 +665,19 @@ impl<'a> Evaluator<'a> {
                 })
             }
             (EvalValue::Integer(a), EvalValue::Integer(b)) => {
-                Ok(EvalValue::Bool(apply_ordering(*a, *b, op)))
+                Ok(EvalValue::Bool(apply_ordering(*a, *b, op)?))
             }
             (EvalValue::Float(a), EvalValue::Float(b)) => {
-                Ok(EvalValue::Bool(apply_ordering_f64(*a, *b, op)))
+                Ok(EvalValue::Bool(apply_ordering_f64(*a, *b, op)?))
             }
             (EvalValue::Integer(a), EvalValue::Float(b)) => {
-                Ok(EvalValue::Bool(apply_ordering_f64(*a as f64, *b, op)))
+                Ok(EvalValue::Bool(apply_ordering_f64(*a as f64, *b, op)?))
             }
             (EvalValue::Float(a), EvalValue::Integer(b)) => {
-                Ok(EvalValue::Bool(apply_ordering_f64(*a, *b as f64, op)))
+                Ok(EvalValue::Bool(apply_ordering_f64(*a, *b as f64, op)?))
             }
             (EvalValue::Str(a), EvalValue::Str(b)) => {
-                Ok(EvalValue::Bool(apply_ordering(a.as_str(), b.as_str(), op)))
+                Ok(EvalValue::Bool(apply_ordering(a.as_str(), b.as_str(), op)?))
             }
             _ => Err(EvalError::TypeError {
                 operation: op_name.to_string(),
@@ -829,7 +849,9 @@ impl<'a> Evaluator<'a> {
         let between_name = match op {
             ComparisonOp::Between => "BETWEEN",
             ComparisonOp::NotBetween => "NOT BETWEEN",
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: unexpected operator {:?} in BETWEEN evaluation", other),
+            )),
         };
         // Check for NULL at the BETWEEN level so the error names the right operation
         if matches!(value, EvalValue::Null) || matches!(low, EvalValue::Null) || matches!(high, EvalValue::Null) {
@@ -844,13 +866,18 @@ impl<'a> Evaluator<'a> {
 
         let result = match (&ge_low, &le_high) {
             (EvalValue::Bool(a), EvalValue::Bool(b)) => *a && *b,
-            _ => unreachable!(),
+            _ => return Err(EvalError::EvalParseError(
+                format!("Internal error: BETWEEN comparison returned non-boolean results ({}, {})",
+                    ge_low.type_name(), le_high.type_name()),
+            )),
         };
 
         match op {
             ComparisonOp::Between => Ok(EvalValue::Bool(result)),
             ComparisonOp::NotBetween => Ok(EvalValue::Bool(!result)),
-            _ => unreachable!(),
+            other => Err(EvalError::EvalParseError(
+                format!("Internal error: unexpected operator {:?} in BETWEEN result", other),
+            )),
         }
     }
 
@@ -874,14 +901,18 @@ impl<'a> Evaluator<'a> {
                 return match op {
                     ComparisonOp::In => Ok(EvalValue::Bool(true)),
                     ComparisonOp::NotIn => Ok(EvalValue::Bool(false)),
-                    _ => unreachable!(),
+                    other => Err(EvalError::EvalParseError(
+                        format!("Internal error: unexpected operator {:?} in IN evaluation", other),
+                    )),
                 };
             }
         }
         match op {
             ComparisonOp::In => Ok(EvalValue::Bool(false)),
             ComparisonOp::NotIn => Ok(EvalValue::Bool(true)),
-            _ => unreachable!(),
+            other => Err(EvalError::EvalParseError(
+                format!("Internal error: unexpected operator {:?} in IN evaluation", other),
+            )),
         }
     }
 
@@ -889,7 +920,9 @@ impl<'a> Evaluator<'a> {
         let op_name = match op {
             ComparisonOp::Like => "LIKE",
             ComparisonOp::NotLike => "NOT LIKE",
-            _ => unreachable!(),
+            other => return Err(EvalError::EvalParseError(
+                format!("Internal error: unexpected operator {:?} in LIKE evaluation", other),
+            )),
         };
 
         match (value, pattern) {
@@ -904,7 +937,9 @@ impl<'a> Evaluator<'a> {
                 match op {
                     ComparisonOp::Like => Ok(EvalValue::Bool(matched)),
                     ComparisonOp::NotLike => Ok(EvalValue::Bool(!matched)),
-                    _ => unreachable!(),
+                    other => Err(EvalError::EvalParseError(
+                        format!("Internal error: unexpected operator {:?} in LIKE result", other),
+                    )),
                 }
             }
             _ => Err(EvalError::TypeError {
@@ -956,23 +991,27 @@ impl<'a> Evaluator<'a> {
 // ORDERING HELPERS
 // ============================================================================
 
-fn apply_ordering<T: PartialOrd>(a: T, b: T, op: ComparisonOp) -> bool {
+fn apply_ordering<T: PartialOrd>(a: T, b: T, op: ComparisonOp) -> Result<bool, EvalError> {
     match op {
-        ComparisonOp::GreaterThan => a > b,
-        ComparisonOp::GreaterThanEqual => a >= b,
-        ComparisonOp::LessThan => a < b,
-        ComparisonOp::LessThanEqual => a <= b,
-        _ => unreachable!(),
+        ComparisonOp::GreaterThan => Ok(a > b),
+        ComparisonOp::GreaterThanEqual => Ok(a >= b),
+        ComparisonOp::LessThan => Ok(a < b),
+        ComparisonOp::LessThanEqual => Ok(a <= b),
+        other => Err(EvalError::EvalParseError(
+            format!("Internal error: unexpected operator {:?} in ordering comparison", other),
+        )),
     }
 }
 
-fn apply_ordering_f64(a: f64, b: f64, op: ComparisonOp) -> bool {
+fn apply_ordering_f64(a: f64, b: f64, op: ComparisonOp) -> Result<bool, EvalError> {
     match op {
-        ComparisonOp::GreaterThan => a > b,
-        ComparisonOp::GreaterThanEqual => a >= b,
-        ComparisonOp::LessThan => a < b,
-        ComparisonOp::LessThanEqual => a <= b,
-        _ => unreachable!(),
+        ComparisonOp::GreaterThan => Ok(a > b),
+        ComparisonOp::GreaterThanEqual => Ok(a >= b),
+        ComparisonOp::LessThan => Ok(a < b),
+        ComparisonOp::LessThanEqual => Ok(a <= b),
+        other => Err(EvalError::EvalParseError(
+            format!("Internal error: unexpected operator {:?} in ordering comparison", other),
+        )),
     }
 }
 

@@ -413,7 +413,11 @@ impl Parser {
             let op = match self.current_token.token_type {
                 TokenType::PLUS => AddOp::Plus,
                 TokenType::MINUS => AddOp::Minus,
-                _ => unreachable!(),
+                _ => return Err(ParseError::at_position(
+                    format!("Expected '+' or '-', found {:?} '{}'",
+                        self.current_token.token_type, self.current_token.image),
+                    self.current_token.begin_offset,
+                )),
             };
             operators.push(op);
 
@@ -451,7 +455,11 @@ impl Parser {
                 TokenType::STAR => MultExprOp::Star,
                 TokenType::SLASH => MultExprOp::Slash,
                 TokenType::PERCENT => MultExprOp::Percent,
-                _ => unreachable!(),
+                _ => return Err(ParseError::at_position(
+                    format!("Expected '*', '/' or '%', found {:?} '{}'",
+                        self.current_token.token_type, self.current_token.image),
+                    self.current_token.begin_offset,
+                )),
             };
             operators.push(op);
 
