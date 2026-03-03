@@ -1322,3 +1322,725 @@ fn test_boolean_literal_in_value_context() {
     assert_eq!(evaluate("'FALSE' != 'TRUE'", &map).unwrap(), true);
 }
 
+// ============================================================================
+// MIXED NUMERIC FORMAT TESTS (DECIMAL / HEX / OCTAL)
+// ============================================================================
+
+// --- Equality comparisons with mixed formats ---
+
+#[test]
+fn test_mixed_hex_equals_decimal() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("0xFF = 255", &map).unwrap(), true);
+    assert_eq!(evaluate("0x0A = 10", &map).unwrap(), true);
+    assert_eq!(evaluate("0x00 = 0", &map).unwrap(), true);
+    assert_eq!(evaluate("0x01 = 1", &map).unwrap(), true);
+    assert_eq!(evaluate("0x10 = 16", &map).unwrap(), true);
+    assert_eq!(evaluate("0x64 = 100", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_octal_equals_decimal() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("010 = 8", &map).unwrap(), true);
+    assert_eq!(evaluate("017 = 15", &map).unwrap(), true);
+    assert_eq!(evaluate("077 = 63", &map).unwrap(), true);
+    assert_eq!(evaluate("0144 = 100", &map).unwrap(), true);
+    assert_eq!(evaluate("012 = 10", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_hex_equals_octal() {
+    let map = HashMap::new();
+    // 0x0A = 10, 012 = 10
+    assert_eq!(evaluate("0x0A = 012", &map).unwrap(), true);
+    // 0xFF = 255, 0377 = 255
+    assert_eq!(evaluate("0xFF = 0377", &map).unwrap(), true);
+    // 0x10 = 16, 020 = 16
+    assert_eq!(evaluate("0x10 = 020", &map).unwrap(), true);
+    // 0x08 = 8, 010 = 8
+    assert_eq!(evaluate("0x08 = 010", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_not_equal_formats() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("0xFF <> 254", &map).unwrap(), true);
+    assert_eq!(evaluate("010 <> 9", &map).unwrap(), true);
+    assert_eq!(evaluate("0x0A <> 012", &map).unwrap(), false); // both are 10
+    assert_eq!(evaluate("0xFF != 0376", &map).unwrap(), true); // 255 != 254
+}
+
+// --- Equality with variables ---
+
+#[test]
+fn test_mixed_variable_equals_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(255));
+    assert_eq!(evaluate("x = 0xFF", &map).unwrap(), true);
+    assert_eq!(evaluate("x <> 0xFE", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_variable_equals_octal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(8));
+    assert_eq!(evaluate("x = 010", &map).unwrap(), true);
+    assert_eq!(evaluate("x <> 011", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_float_variable_with_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Float(10.0));
+    // Integer/Float cross-comparison in equality
+    assert_eq!(evaluate("x = 0x0A", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_float_variable_with_octal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Float(8.0));
+    assert_eq!(evaluate("x = 010", &map).unwrap(), true);
+}
+
+// --- Ordering comparisons with mixed formats ---
+
+#[test]
+fn test_mixed_hex_greater_than_decimal() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("0xFF > 254", &map).unwrap(), true);
+    assert_eq!(evaluate("0xFF > 255", &map).unwrap(), false);
+    assert_eq!(evaluate("0x0A > 9", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_octal_greater_than_decimal() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("010 > 7", &map).unwrap(), true);
+    assert_eq!(evaluate("010 > 8", &map).unwrap(), false);
+    assert_eq!(evaluate("077 > 62", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_hex_less_than_octal() {
+    let map = HashMap::new();
+    // 0x07 = 7, 010 = 8
+    assert_eq!(evaluate("0x07 < 010", &map).unwrap(), true);
+    // 0x09 = 9, 010 = 8
+    assert_eq!(evaluate("0x09 < 010", &map).unwrap(), false);
+}
+
+#[test]
+fn test_mixed_greater_equal_formats() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("0xFF >= 255", &map).unwrap(), true);
+    assert_eq!(evaluate("0xFF >= 256", &map).unwrap(), false);
+    assert_eq!(evaluate("010 >= 010", &map).unwrap(), true);
+    assert_eq!(evaluate("0x10 >= 020", &map).unwrap(), true); // both 16
+}
+
+#[test]
+fn test_mixed_less_equal_formats() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("0x0A <= 012", &map).unwrap(), true); // both 10
+    assert_eq!(evaluate("0x0A <= 10", &map).unwrap(), true);
+    assert_eq!(evaluate("010 <= 0x08", &map).unwrap(), true); // both 8
+}
+
+#[test]
+fn test_mixed_ordering_variable_vs_hex() {
+    let mut map = HashMap::new();
+    map.insert("score".to_string(), RuntimeValue::Integer(200));
+    assert_eq!(evaluate("score > 0xC7", &map).unwrap(), true); // 200 > 199
+    assert_eq!(evaluate("score < 0xC9", &map).unwrap(), true); // 200 < 201
+    assert_eq!(evaluate("score >= 0xC8", &map).unwrap(), true); // 200 >= 200
+    assert_eq!(evaluate("score <= 0xC8", &map).unwrap(), true); // 200 <= 200
+}
+
+#[test]
+fn test_mixed_ordering_variable_vs_octal() {
+    let mut map = HashMap::new();
+    map.insert("val".to_string(), RuntimeValue::Integer(63));
+    assert_eq!(evaluate("val > 076", &map).unwrap(), true); // 63 > 62
+    assert_eq!(evaluate("val < 0100", &map).unwrap(), true); // 63 < 64
+    assert_eq!(evaluate("val >= 077", &map).unwrap(), true); // 63 >= 63
+    assert_eq!(evaluate("val <= 077", &map).unwrap(), true); // 63 <= 63
+}
+
+// --- Arithmetic with mixed formats ---
+
+#[test]
+fn test_mixed_addition_hex_decimal() {
+    let map = HashMap::new();
+    // 0x0A + 5 = 15
+    assert_eq!(evaluate("0x0A + 5 = 15", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_addition_octal_decimal() {
+    let map = HashMap::new();
+    // 010 + 2 = 10
+    assert_eq!(evaluate("010 + 2 = 10", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_addition_hex_octal() {
+    let map = HashMap::new();
+    // 0x0A + 010 = 10 + 8 = 18
+    assert_eq!(evaluate("0x0A + 010 = 18", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_subtraction_hex_decimal() {
+    let map = HashMap::new();
+    // 0xFF - 200 = 55
+    assert_eq!(evaluate("0xFF - 200 = 55", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_subtraction_octal_hex() {
+    let map = HashMap::new();
+    // 077 - 0x3E = 63 - 62 = 1
+    assert_eq!(evaluate("077 - 0x3E = 1", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_multiplication_hex_decimal() {
+    let map = HashMap::new();
+    // 0x0A * 5 = 50
+    assert_eq!(evaluate("0x0A * 5 = 50", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_multiplication_octal_hex() {
+    let map = HashMap::new();
+    // 010 * 0x04 = 8 * 4 = 32
+    assert_eq!(evaluate("010 * 0x04 = 32", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_division_hex_decimal() {
+    let map = HashMap::new();
+    // 0x14 / 4 = 20 / 4 = 5
+    assert_eq!(evaluate("0x14 / 4 = 5", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_division_octal_decimal() {
+    let map = HashMap::new();
+    // 020 / 4 = 16 / 4 = 4
+    assert_eq!(evaluate("020 / 4 = 4", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_modulo_hex_decimal() {
+    let map = HashMap::new();
+    // 0xFF % 100 = 255 % 100 = 55
+    assert_eq!(evaluate("0xFF % 100 = 55", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_modulo_octal_hex() {
+    let map = HashMap::new();
+    // 077 % 0x0A = 63 % 10 = 3
+    assert_eq!(evaluate("077 % 0x0A = 3", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_arithmetic_with_variable() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    // x + 0xFF = 10 + 255 = 265
+    assert_eq!(evaluate("x + 0xFF = 265", &map).unwrap(), true);
+    // x * 010 = 10 * 8 = 80
+    assert_eq!(evaluate("x * 010 = 80", &map).unwrap(), true);
+    // x - 0x05 = 10 - 5 = 5
+    assert_eq!(evaluate("x - 0x05 = 5", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_arithmetic_all_three_formats() {
+    let map = HashMap::new();
+    // 0x0A + 010 + 2 = 10 + 8 + 2 = 20
+    assert_eq!(evaluate("0x0A + 010 + 2 = 20", &map).unwrap(), true);
+    // 0xFF - 077 - 100 = 255 - 63 - 100 = 92
+    assert_eq!(evaluate("0xFF - 077 - 100 = 92", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_complex_arithmetic_expression() {
+    let mut map = HashMap::new();
+    map.insert("base".to_string(), RuntimeValue::Integer(100));
+    // base + 0x0A * 010 = 100 + 10 * 8 = 100 + 80 = 180 (multiplication has higher precedence)
+    assert_eq!(evaluate("(base + 0x0A * 010) = 180", &map).unwrap(), true);
+}
+
+// --- BETWEEN with mixed formats ---
+
+#[test]
+fn test_between_hex_bounds() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(128));
+    // x BETWEEN 0x00 AND 0xFF => 128 between 0 and 255
+    assert_eq!(evaluate("x BETWEEN 0x00 AND 0xFF", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_octal_bounds() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    // x BETWEEN 010 AND 077 => 10 between 8 and 63
+    assert_eq!(evaluate("x BETWEEN 010 AND 077", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_hex_low_decimal_high() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(50));
+    // x BETWEEN 0x0A AND 100 => 50 between 10 and 100
+    assert_eq!(evaluate("x BETWEEN 0x0A AND 100", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_decimal_low_hex_high() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(200));
+    // x BETWEEN 10 AND 0xFF => 200 between 10 and 255
+    assert_eq!(evaluate("x BETWEEN 10 AND 0xFF", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_octal_low_hex_high() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(20));
+    // x BETWEEN 010 AND 0xFF => 20 between 8 and 255
+    assert_eq!(evaluate("x BETWEEN 010 AND 0xFF", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_hex_low_octal_high() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(30));
+    // x BETWEEN 0x0A AND 077 => 30 between 10 and 63
+    assert_eq!(evaluate("x BETWEEN 0x0A AND 077", &map).unwrap(), true);
+}
+
+#[test]
+fn test_between_false_with_mixed_formats() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(5));
+    // x BETWEEN 0x0A AND 0xFF => 5 NOT between 10 and 255
+    assert_eq!(evaluate("x BETWEEN 0x0A AND 0xFF", &map).unwrap(), false);
+}
+
+#[test]
+fn test_between_boundary_with_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    // Boundary: x = low bound
+    assert_eq!(evaluate("x BETWEEN 0x0A AND 0xFF", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(255));
+    // Boundary: x = high bound
+    assert_eq!(evaluate("x BETWEEN 0x0A AND 0xFF", &map).unwrap(), true);
+}
+
+#[test]
+fn test_not_between_hex_bounds() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(300));
+    assert_eq!(evaluate("x NOT BETWEEN 0x00 AND 0xFF", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(128));
+    assert_eq!(evaluate("x NOT BETWEEN 0x00 AND 0xFF", &map).unwrap(), false);
+}
+
+#[test]
+fn test_not_between_octal_bounds() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(100));
+    // x NOT BETWEEN 010 AND 077 => 100 NOT between 8 and 63
+    assert_eq!(evaluate("x NOT BETWEEN 010 AND 077", &map).unwrap(), true);
+}
+
+#[test]
+fn test_not_between_mixed_formats() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(5));
+    // x NOT BETWEEN 0x0A AND 077 => 5 NOT between 10 and 63
+    assert_eq!(evaluate("x NOT BETWEEN 0x0A AND 077", &map).unwrap(), true);
+}
+
+// --- IN with mixed formats ---
+
+#[test]
+fn test_in_all_hex_elements() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(255));
+    assert_eq!(evaluate("x IN (0x0A, 0xFF, 0x10)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(99));
+    assert_eq!(evaluate("x IN (0x0A, 0xFF, 0x10)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_in_all_octal_elements() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(8));
+    assert_eq!(evaluate("x IN (010, 017, 077)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(9));
+    assert_eq!(evaluate("x IN (010, 017, 077)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_in_mixed_hex_and_decimal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(16));
+    // Mix hex and decimal in IN list
+    assert_eq!(evaluate("x IN (0x0A, 16, 0xFF)", &map).unwrap(), true);
+    assert_eq!(evaluate("x IN (0x0A, 15, 0xFF)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_in_mixed_octal_and_decimal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(63));
+    assert_eq!(evaluate("x IN (010, 63, 0144)", &map).unwrap(), true);
+}
+
+#[test]
+fn test_in_mixed_hex_and_octal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    // 0x0A = 10, 010 = 8, 0x10 = 16
+    assert_eq!(evaluate("x IN (0x0A, 010, 0x10)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(8));
+    assert_eq!(evaluate("x IN (0x0A, 010, 0x10)", &map).unwrap(), true);
+}
+
+#[test]
+fn test_in_all_three_formats() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(100));
+    // 0x64 = 100, 010 = 8, 42 = 42
+    assert_eq!(evaluate("x IN (0x64, 010, 42)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(8));
+    assert_eq!(evaluate("x IN (0x64, 010, 42)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(42));
+    assert_eq!(evaluate("x IN (0x64, 010, 42)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(99));
+    assert_eq!(evaluate("x IN (0x64, 010, 42)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_not_in_hex_elements() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(99));
+    assert_eq!(evaluate("x NOT IN (0x0A, 0xFF, 0x10)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(255));
+    assert_eq!(evaluate("x NOT IN (0x0A, 0xFF, 0x10)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_not_in_octal_elements() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(9));
+    assert_eq!(evaluate("x NOT IN (010, 017, 077)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(15));
+    assert_eq!(evaluate("x NOT IN (010, 017, 077)", &map).unwrap(), false);
+}
+
+#[test]
+fn test_not_in_mixed_formats() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(50));
+    // 0x0A = 10, 010 = 8, 42 = 42
+    assert_eq!(evaluate("x NOT IN (0x0A, 010, 42)", &map).unwrap(), true);
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    assert_eq!(evaluate("x NOT IN (0x0A, 010, 42)", &map).unwrap(), false);
+}
+
+// --- Unary operators on hex/octal ---
+
+#[test]
+fn test_unary_minus_hex() {
+    let map = HashMap::new();
+    // -0x0A = -10
+    assert_eq!(evaluate("-0x0A = -10", &map).unwrap(), true);
+    assert_eq!(evaluate("-0xFF = -255", &map).unwrap(), true);
+}
+
+#[test]
+fn test_unary_minus_octal() {
+    let map = HashMap::new();
+    // -010 = -8
+    assert_eq!(evaluate("-010 = -8", &map).unwrap(), true);
+    assert_eq!(evaluate("-077 = -63", &map).unwrap(), true);
+}
+
+#[test]
+fn test_unary_plus_hex() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("+0x0A = 10", &map).unwrap(), true);
+}
+
+#[test]
+fn test_unary_plus_octal() {
+    let map = HashMap::new();
+    assert_eq!(evaluate("+010 = 8", &map).unwrap(), true);
+}
+
+// --- IS NULL / IS NOT NULL with hex/octal in same expression ---
+
+#[test]
+fn test_is_null_and_hex_comparison() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    map.insert("y".to_string(), RuntimeValue::Integer(255));
+    assert_eq!(evaluate("x IS NULL AND y = 0xFF", &map).unwrap(), true);
+    assert_eq!(evaluate("x IS NULL AND y > 0xFE", &map).unwrap(), true);
+}
+
+#[test]
+fn test_is_not_null_and_octal_comparison() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(42));
+    map.insert("y".to_string(), RuntimeValue::Integer(8));
+    assert_eq!(evaluate("x IS NOT NULL AND y = 010", &map).unwrap(), true);
+}
+
+#[test]
+fn test_is_null_or_hex_match() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(16));
+    assert_eq!(evaluate("x IS NULL OR x = 0x10", &map).unwrap(), true);
+}
+
+// --- Complex expressions combining multiple contexts ---
+
+#[test]
+fn test_mixed_complex_and_or_with_hex_octal() {
+    let mut map = HashMap::new();
+    map.insert("a".to_string(), RuntimeValue::Integer(100));
+    map.insert("b".to_string(), RuntimeValue::Integer(8));
+    // a > 0x50 (80) AND b = 010 (8)
+    assert_eq!(evaluate("a > 0x50 AND b = 010", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_arithmetic_in_comparison_with_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    // (x + 0x06) = 0x10 => (10 + 6) = 16
+    assert_eq!(evaluate("(x + 0x06) = 0x10", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_arithmetic_in_comparison_with_octal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(4));
+    // (x * 010) = 32 => (4 * 8) = 32
+    assert_eq!(evaluate("(x * 010) = 32", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_between_with_arithmetic() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(50));
+    // (x + 0x0A) BETWEEN 010 AND 0xFF => 60 between 8 and 255
+    assert_eq!(evaluate("(x + 0x0A) BETWEEN 010 AND 0xFF", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_in_with_variable_arithmetic() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(6));
+    // (x + 0x04) IN (0x0A, 010, 20) => 10 IN (10, 8, 20)
+    assert_eq!(evaluate("(x + 0x04) IN (0x0A, 010, 20)", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_complex_nested_expression() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(100));
+    map.insert("y".to_string(), RuntimeValue::Integer(200));
+    // (x > 0x32 AND y < 0xC9) OR x BETWEEN 010 AND 077
+    // (100 > 50 AND 200 < 201) OR 100 BETWEEN 8 AND 63
+    // (true AND true) OR false = true
+    assert_eq!(
+        evaluate("(x > 0x32 AND y < 0xC9) OR x BETWEEN 010 AND 077", &map).unwrap(),
+        true
+    );
+}
+
+#[test]
+fn test_mixed_all_formats_in_single_expression() {
+    let mut map = HashMap::new();
+    map.insert("a".to_string(), RuntimeValue::Integer(10));
+    map.insert("b".to_string(), RuntimeValue::Integer(8));
+    map.insert("c".to_string(), RuntimeValue::Integer(255));
+    // a = 0x0A AND b = 010 AND c = 255
+    assert_eq!(
+        evaluate("a = 0x0A AND b = 010 AND c = 255", &map).unwrap(),
+        true
+    );
+}
+
+#[test]
+fn test_mixed_not_with_hex_comparison() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(100));
+    // NOT (100 = 255) => NOT false => true
+    assert_eq!(evaluate("NOT (x = 0xFF)", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_not_with_octal_comparison() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(100));
+    // NOT (100 = 63) => NOT false => true
+    assert_eq!(evaluate("NOT (x = 077)", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_chained_arithmetic_all_formats() {
+    let map = HashMap::new();
+    // 0xFF - 0x0A - 010 - 100 = 255 - 10 - 8 - 100 = 137
+    assert_eq!(evaluate("0xFF - 0x0A - 010 - 100 = 137", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_multiplicative_all_formats() {
+    let map = HashMap::new();
+    // 0x02 * 010 * 3 = 2 * 8 * 3 = 48
+    assert_eq!(evaluate("0x02 * 010 * 3 = 48", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_division_hex_by_octal() {
+    let map = HashMap::new();
+    // 0x10 / 010 = 16 / 8 = 2
+    assert_eq!(evaluate("0x10 / 010 = 2", &map).unwrap(), true);
+}
+
+#[test]
+fn test_mixed_modulo_all_formats() {
+    let map = HashMap::new();
+    // 0xFF % 010 = 255 % 8 = 7
+    assert_eq!(evaluate("0xFF % 010 = 7", &map).unwrap(), true);
+    // 0xFF % 100 = 255 % 100 = 55
+    assert_eq!(evaluate("0xFF % 100 = 55", &map).unwrap(), true);
+}
+
+// --- Error cases with hex/octal ---
+
+#[test]
+fn test_error_null_in_arithmetic_with_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    let result = evaluate("(x + 0xFF) > 0", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::NullInOperation { operation, .. } => {
+            assert_eq!(operation, "addition");
+        }
+        other => panic!("Expected NullInOperation, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_null_in_comparison_with_octal() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    let result = evaluate("x > 010", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::NullInOperation { operation, .. } => {
+            assert_eq!(operation, "GreaterThan");
+        }
+        other => panic!("Expected NullInOperation, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_null_in_equality_with_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    let result = evaluate("x = 0xFF", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::NullInOperation { operation, .. } => {
+            assert_eq!(operation, "Equal");
+        }
+        other => panic!("Expected NullInOperation, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_null_in_between_with_hex_bounds() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    let result = evaluate("x BETWEEN 0x00 AND 0xFF", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::NullInOperation { operation, .. } => {
+            assert_eq!(operation, "BETWEEN");
+        }
+        other => panic!("Expected NullInOperation, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_string_in_hex_in_list() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::String("hello".to_string()));
+    let result = evaluate("x IN (0x0A, 0xFF)", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::TypeError { operation, expected, .. } => {
+            assert_eq!(operation, "IN");
+            assert_eq!(expected, "integer");
+        }
+        other => panic!("Expected TypeError, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_string_in_octal_in_list() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::String("hello".to_string()));
+    let result = evaluate("x IN (010, 077)", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::TypeError { operation, expected, .. } => {
+            assert_eq!(operation, "IN");
+            assert_eq!(expected, "integer");
+        }
+        other => panic!("Expected TypeError, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_division_by_zero_hex() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Integer(10));
+    let result = evaluate("x / 0x00 > 0", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::DivisionByZero { .. } => {}
+        other => panic!("Expected DivisionByZero, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_error_unary_minus_null_with_hex_context() {
+    let mut map = HashMap::new();
+    map.insert("x".to_string(), RuntimeValue::Null);
+    let result = evaluate("(-x) = 0x0A", &map);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        EvalError::NullInOperation { operation, .. } => {
+            assert_eq!(operation, "unary minus");
+        }
+        other => panic!("Expected NullInOperation, got: {:?}", other),
+    }
+}
+
