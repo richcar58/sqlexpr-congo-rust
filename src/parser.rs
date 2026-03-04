@@ -679,8 +679,41 @@ impl Parser {
 
     // ========== BETWEEN / IN Helper Methods ==========
 
-    /// Parse a BETWEEN bound: only accepts numeric literals or STRING_LITERAL.
+    /// Parse a BETWEEN bound: only accepts numeric literals (optionally signed) or STRING_LITERAL.
     fn parse_between_bound(&mut self) -> ParseResult<NodeId> {
+        // Handle sign prefix for negative/positive numbers in BETWEEN bounds
+        if matches!(self.current_token.token_type, TokenType::MINUS | TokenType::PLUS) {
+            let begin_token = self.alloc_current_token();
+            let operator = if self.current_token.token_type == TokenType::MINUS {
+                UnaryOp::Negate
+            } else {
+                UnaryOp::Plus
+            };
+            self.consume_token()?;
+            // After sign, must be a numeric literal
+            match self.current_token.token_type {
+                TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL
+                | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL => {}
+                _ => {
+                    return Err(ParseError::at_position(
+                        format!(
+                            "Expected numeric literal after '{}' in BETWEEN bound, found {:?} '{}'",
+                            if operator == UnaryOp::Negate { "-" } else { "+" },
+                            self.current_token.token_type, self.current_token.image
+                        ),
+                        self.current_token.begin_offset,
+                    ));
+                }
+            }
+            let child = self.parse_primary_expr()?;
+            let end_token = self.current_token_id.unwrap_or(begin_token);
+            let mut node = UnaryExprNode::new(begin_token, end_token);
+            node.children.push(child);
+            node.operator = Some(operator);
+            let node_id = self.arena.alloc_node(AstNode::UnaryExpr(node));
+            self.set_parent(child, node_id);
+            return Ok(node_id);
+        }
         match self.current_token.token_type {
             TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL
             | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL
@@ -695,7 +728,7 @@ impl Parser {
             }
             TokenType::NULL => {
                 Err(ParseError::at_position(
-                    "BETWEEN bounds cannot be NULL".to_string(),
+                    "NULL is not allowed in BETWEEN bounds".to_string(),
                     self.current_token.begin_offset,
                 ))
             }
@@ -717,9 +750,22 @@ impl Parser {
         }
     }
 
-    /// Get the token image for a literal node, navigating through PrimaryExpr → Literal → StringLiteral.
+    /// Get the token image for a literal node, navigating through UnaryExpr → PrimaryExpr → Literal → StringLiteral.
+    /// For signed literals (UnaryExpr with Negate), prepends "-" to the inner image.
     fn get_literal_image(&self, node_id: NodeId) -> String {
         match self.arena.get_node(node_id) {
+            AstNode::UnaryExpr(n) => {
+                if !n.children.is_empty() {
+                    let inner = self.get_literal_image(n.children[0]);
+                    match n.operator {
+                        Some(UnaryOp::Negate) => format!("-{}", inner),
+                        Some(UnaryOp::Plus) => inner,
+                        _ => inner,
+                    }
+                } else {
+                    String::new()
+                }
+            }
             AstNode::PrimaryExpr(n) => {
                 if n.children.is_empty() {
                     self.arena.get_token(n.begin_token).image.clone()
@@ -741,9 +787,16 @@ impl Parser {
         }
     }
 
-    /// Get the token type for a literal node.
+    /// Get the token type for a literal node, walking through UnaryExpr wrappers.
     fn get_literal_token_type(&self, node_id: NodeId) -> TokenType {
         match self.arena.get_node(node_id) {
+            AstNode::UnaryExpr(n) => {
+                if !n.children.is_empty() {
+                    self.get_literal_token_type(n.children[0])
+                } else {
+                    TokenType::INVALID
+                }
+            }
             AstNode::PrimaryExpr(n) => {
                 if n.children.is_empty() {
                     self.arena.get_token(n.begin_token).token_type
@@ -776,9 +829,11 @@ impl Parser {
         let high_is_string = high_type == TokenType::STRING_LITERAL;
 
         if low_is_numeric && high_is_string || low_is_string && high_is_numeric {
+            let low_kind = if low_is_string { "string" } else { "integer" };
+            let high_kind = if high_is_string { "string" } else { "integer" };
             return Err(ParseError::new(format!(
-                "BETWEEN bounds must be the same type: cannot mix numeric and string ('{}' AND '{}')",
-                low_image, high_image
+                "BETWEEN bounds must be the same type (both numeric or both string): found {} ('{}') and {} ('{}')",
+                low_kind, low_image, high_kind, high_image
             )));
         }
 
@@ -868,13 +923,13 @@ impl Parser {
             }
             TokenType::TRUE | TokenType::FALSE => {
                 Err(ParseError::at_position(
-                    "IN list elements cannot be boolean values".to_string(),
+                    "Boolean is not allowed in IN list elements".to_string(),
                     self.current_token.begin_offset,
                 ))
             }
             TokenType::NULL => {
                 Err(ParseError::at_position(
-                    "IN list elements cannot be NULL".to_string(),
+                    "NULL is not allowed in IN list elements".to_string(),
                     self.current_token.begin_offset,
                 ))
             }
@@ -901,10 +956,15 @@ impl Parser {
             _ => false,
         };
         if !compatible {
+            let type_name = |t: &InElementType| match t {
+                InElementType::Integer => "integer",
+                InElementType::Float => "float",
+                InElementType::StringLit => "string",
+            };
             Err(ParseError::at_position(
                 format!(
-                    "IN list elements must all be the same type: first element is {:?}, but found {:?} '{}'",
-                    first, current, self.current_token.image
+                    "IN list elements must all be the same type: first element is {}, but found {} '{}'",
+                    type_name(first), type_name(current), self.current_token.image
                 ),
                 self.current_token.begin_offset,
             ))

@@ -1475,7 +1475,7 @@ fn test_in_mixed_types_error() {
 #[test]
 fn test_in_boolean_error() {
     let msg = parse_err("x IN (TRUE)");
-    assert!(msg.contains("boolean"), "msg was: {}", msg);
+    assert!(msg.contains("Boolean"), "msg was: {}", msg);
 }
 
 #[test]
