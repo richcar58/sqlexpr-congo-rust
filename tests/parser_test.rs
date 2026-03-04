@@ -107,32 +107,30 @@ fn primary_value(arena: &Arena, id: NodeId) -> String {
 
 #[test]
 fn test_integer_literal() {
-    let (p, root) = parse_ok("42");
-    let n = skip(p.arena(), root);
-    assert!(matches!(p.arena().get_node(n), AstNode::PrimaryExpr(_)));
-    assert_eq!(primary_value(p.arena(), n), "42");
+    // Standalone integer literals are rejected as non-boolean
+    let msg = parse_err("42");
+    assert!(msg.contains("boolean"), "Expected boolean enforcement error, got: {}", msg);
 }
 
 #[test]
 fn test_decimal_literal() {
-    let (p, root) = parse_ok("3.14");
-    let n = skip(p.arena(), root);
-    assert_eq!(primary_value(p.arena(), n), "3.14");
+    // Standalone decimal literals are rejected as non-boolean
+    let msg = parse_err("3.14");
+    assert!(msg.contains("boolean"), "Expected boolean enforcement error, got: {}", msg);
 }
 
 #[test]
 fn test_string_literal() {
-    let (p, root) = parse_ok("'hello'");
-    let n = skip(p.arena(), root);
-    assert!(matches!(p.arena().get_node(n), AstNode::PrimaryExpr(_)));
-    assert_eq!(primary_value(p.arena(), n), "'hello'");
+    // Standalone string literals are rejected as non-boolean
+    let msg = parse_err("'hello'");
+    assert!(msg.contains("boolean"), "Expected boolean enforcement error, got: {}", msg);
 }
 
 #[test]
 fn test_empty_string_literal() {
-    let (p, root) = parse_ok("''");
-    let n = skip(p.arena(), root);
-    assert_eq!(primary_value(p.arena(), n), "''");
+    // Standalone string literals are rejected as non-boolean
+    let msg = parse_err("''");
+    assert!(msg.contains("boolean"), "Expected boolean enforcement error, got: {}", msg);
 }
 
 #[test]
@@ -150,8 +148,9 @@ fn test_false_literal() {
 
 #[test]
 fn test_null_literal() {
-    let (p, root) = parse_ok("NULL");
-    assert_eq!(primary_value(p.arena(), root), "NULL");
+    // Standalone NULL literals are rejected as non-boolean
+    let msg = parse_err("NULL");
+    assert!(msg.contains("boolean"), "Expected boolean enforcement error, got: {}", msg);
 }
 
 #[test]
@@ -482,81 +481,116 @@ fn test_not_in_multiple() {
 
 #[test]
 fn test_addition() {
-    let (p, root) = parse_ok("a + b");
+    let (p, root) = parse_ok("a + b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::AddExpression(add) = p.arena().get_node(n) {
-        assert_eq!(add.operators, vec![AddOp::Plus]);
-        assert_eq!(add.children.len(), 2);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus]);
+            assert_eq!(add.children.len(), 2);
+        } else {
+            panic!("expected AddExpression on lhs");
+        }
     } else {
-        panic!("expected AddExpression, got {:?}", p.arena().get_node(n));
+        panic!("expected ComparisonExpression, got {:?}", p.arena().get_node(n));
     }
 }
 
 #[test]
 fn test_subtraction() {
-    let (p, root) = parse_ok("a - b");
+    let (p, root) = parse_ok("a - b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::AddExpression(add) = p.arena().get_node(n) {
-        assert_eq!(add.operators, vec![AddOp::Minus]);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Minus]);
+        } else {
+            panic!("expected AddExpression on lhs");
+        }
     } else {
-        panic!("expected AddExpression");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_chained_add_sub() {
-    let (p, root) = parse_ok("a + b - c + d");
+    let (p, root) = parse_ok("a + b - c + d > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::AddExpression(add) = p.arena().get_node(n) {
-        assert_eq!(add.operators, vec![AddOp::Plus, AddOp::Minus, AddOp::Plus]);
-        assert_eq!(add.children.len(), 4);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus, AddOp::Minus, AddOp::Plus]);
+            assert_eq!(add.children.len(), 4);
+        } else {
+            panic!("expected AddExpression on lhs");
+        }
     } else {
-        panic!("expected AddExpression");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_multiplication() {
-    let (p, root) = parse_ok("a * b");
+    let (p, root) = parse_ok("a * b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Star]);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Star]);
+        } else {
+            panic!("expected MultExpr on lhs");
+        }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_division() {
-    let (p, root) = parse_ok("a / b");
+    let (p, root) = parse_ok("a / b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Slash]);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Slash]);
+        } else {
+            panic!("expected MultExpr on lhs");
+        }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_modulo() {
-    let (p, root) = parse_ok("a % b");
+    let (p, root) = parse_ok("a % b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Percent]);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Percent]);
+        } else {
+            panic!("expected MultExpr on lhs");
+        }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_chained_mult_div_mod() {
-    let (p, root) = parse_ok("a * b / c % d");
+    let (p, root) = parse_ok("a * b / c % d > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Star, MultExprOp::Slash, MultExprOp::Percent]);
-        assert_eq!(mul.children.len(), 4);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Star, MultExprOp::Slash, MultExprOp::Percent]);
+            assert_eq!(mul.children.len(), 4);
+        } else {
+            panic!("expected MultExpr on lhs");
+        }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
@@ -566,24 +600,34 @@ fn test_chained_mult_div_mod() {
 
 #[test]
 fn test_unary_plus() {
-    let (p, root) = parse_ok("+x");
+    let (p, root) = parse_ok("+x > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::UnaryExpr(u) = p.arena().get_node(n) {
-        assert_eq!(u.operator, Some(UnaryOp::Plus));
-        assert_eq!(u.children.len(), 1);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
+            assert_eq!(u.operator, Some(UnaryOp::Plus));
+            assert_eq!(u.children.len(), 1);
+        } else {
+            panic!("expected UnaryExpr on lhs");
+        }
     } else {
-        panic!("expected UnaryExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_unary_negate() {
-    let (p, root) = parse_ok("-x");
+    let (p, root) = parse_ok("-x > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::UnaryExpr(u) = p.arena().get_node(n) {
-        assert_eq!(u.operator, Some(UnaryOp::Negate));
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
+            assert_eq!(u.operator, Some(UnaryOp::Negate));
+        } else {
+            panic!("expected UnaryExpr on lhs");
+        }
     } else {
-        panic!("expected UnaryExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
@@ -611,18 +655,19 @@ fn test_unary_not_case_insensitive() {
 
 #[test]
 fn test_double_negate() {
-    let (p, root) = parse_ok("--x");
+    // With -- now being a line comment, --x is treated as a comment followed by EOF
+    // Test that - (-x) still works for double negate
+    let (p, root) = parse_ok("- (-x) > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::UnaryExpr(u) = p.arena().get_node(n) {
-        assert_eq!(u.operator, Some(UnaryOp::Negate));
-        let inner = skip(p.arena(), u.children[0]);
-        if let AstNode::UnaryExpr(u2) = p.arena().get_node(inner) {
-            assert_eq!(u2.operator, Some(UnaryOp::Negate));
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
+            assert_eq!(u.operator, Some(UnaryOp::Negate));
         } else {
-            panic!("expected inner UnaryExpr");
+            panic!("expected outer UnaryExpr");
         }
     } else {
-        panic!("expected UnaryExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
@@ -780,32 +825,42 @@ fn test_or_lower_than_and() {
 
 #[test]
 fn test_mult_higher_than_add() {
-    // a + b * c => AddExpression(a, MultExpr(b, c))
-    let (p, root) = parse_ok("a + b * c");
+    // a + b * c > 0 => ComparisonExpression(AddExpression(a, MultExpr(b, c)), 0)
+    let (p, root) = parse_ok("a + b * c > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::AddExpression(add) = p.arena().get_node(n) {
-        assert_eq!(add.operators, vec![AddOp::Plus]);
-        let rhs = skip(p.arena(), add.children[1]);
-        if let AstNode::MultExpr(mul) = p.arena().get_node(rhs) {
-            assert_eq!(mul.operators, vec![MultExprOp::Star]);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus]);
+            let rhs = skip(p.arena(), add.children[1]);
+            if let AstNode::MultExpr(mul) = p.arena().get_node(rhs) {
+                assert_eq!(mul.operators, vec![MultExprOp::Star]);
+            } else {
+                panic!("expected MultExpr on rhs");
+            }
         } else {
-            panic!("expected MultExpr on rhs");
+            panic!("expected AddExpression on lhs");
         }
     } else {
-        panic!("expected AddExpression");
+        panic!("expected ComparisonExpression");
     }
 }
 
 #[test]
 fn test_parens_override_precedence() {
-    // (a + b) * c => MultExpr(PrimaryExpr(AddExpression(a,b)), c)
-    let (p, root) = parse_ok("(a + b) * c");
+    // (a + b) * c > 0 => ComparisonExpression(MultExpr(PrimaryExpr(AddExpression(a,b)), c), 0)
+    let (p, root) = parse_ok("(a + b) * c > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Star]);
-        assert_eq!(mul.children.len(), 2);
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Star]);
+            assert_eq!(mul.children.len(), 2);
+        } else {
+            panic!("expected MultExpr on lhs");
+        }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
@@ -825,19 +880,24 @@ fn test_comparison_higher_than_equality() {
 
 #[test]
 fn test_unary_higher_than_mult() {
-    // -a * b => MultExpr(UnaryExpr(-,a), b)
-    let (p, root) = parse_ok("-a * b");
+    // -a * b > 0 => ComparisonExpression(MultExpr(UnaryExpr(-,a), b), 0)
+    let (p, root) = parse_ok("-a * b > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::MultExpr(mul) = p.arena().get_node(n) {
-        assert_eq!(mul.operators, vec![MultExprOp::Star]);
-        let lhs = skip(p.arena(), mul.children[0]);
-        if let AstNode::UnaryExpr(u) = p.arena().get_node(lhs) {
-            assert_eq!(u.operator, Some(UnaryOp::Negate));
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::MultExpr(mul) = p.arena().get_node(lhs) {
+            assert_eq!(mul.operators, vec![MultExprOp::Star]);
+            let inner = skip(p.arena(), mul.children[0]);
+            if let AstNode::UnaryExpr(u) = p.arena().get_node(inner) {
+                assert_eq!(u.operator, Some(UnaryOp::Negate));
+            } else {
+                panic!("expected UnaryExpr on lhs of mult");
+            }
         } else {
-            panic!("expected UnaryExpr on lhs");
+            panic!("expected MultExpr on lhs");
         }
     } else {
-        panic!("expected MultExpr");
+        panic!("expected ComparisonExpression");
     }
 }
 
@@ -1006,20 +1066,25 @@ fn test_string_literal_in_equality() {
 
 #[test]
 fn test_numeric_literals_in_arithmetic() {
-    let (p, root) = parse_ok("1 + 2.5 * 3");
+    let (p, root) = parse_ok("1 + 2.5 * 3 > 0");
     let n = skip(p.arena(), root);
-    if let AstNode::AddExpression(add) = p.arena().get_node(n) {
-        assert_eq!(add.operators, vec![AddOp::Plus]);
-        assert_eq!(primary_value(p.arena(), add.children[0]), "1");
-        let rhs = skip(p.arena(), add.children[1]);
-        if let AstNode::MultExpr(mul) = p.arena().get_node(rhs) {
-            assert_eq!(primary_value(p.arena(), mul.children[0]), "2.5");
-            assert_eq!(primary_value(p.arena(), mul.children[1]), "3");
+    if let AstNode::ComparisonExpression(cmp) = p.arena().get_node(n) {
+        let lhs = skip(p.arena(), cmp.children[0]);
+        if let AstNode::AddExpression(add) = p.arena().get_node(lhs) {
+            assert_eq!(add.operators, vec![AddOp::Plus]);
+            assert_eq!(primary_value(p.arena(), add.children[0]), "1");
+            let rhs = skip(p.arena(), add.children[1]);
+            if let AstNode::MultExpr(mul) = p.arena().get_node(rhs) {
+                assert_eq!(primary_value(p.arena(), mul.children[0]), "2.5");
+                assert_eq!(primary_value(p.arena(), mul.children[1]), "3");
+            } else {
+                panic!("expected MultExpr on rhs");
+            }
         } else {
-            panic!("expected MultExpr on rhs");
+            panic!("expected AddExpression on lhs");
         }
     } else {
-        panic!("expected AddExpression");
+        panic!("expected ComparisonExpression");
     }
 }
 

@@ -682,7 +682,7 @@ fn test_null_in_comparison() {
 #[test]
 fn test_non_boolean_top_level() {
     let err = eval_err("42", &empty_map());
-    assert!(matches!(err, EvalError::TypeError { .. }));
+    assert!(matches!(err, EvalError::EvalParseError(_)));
 }
 
 #[test]

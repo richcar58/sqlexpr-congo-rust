@@ -88,6 +88,8 @@ impl Parser {
 
         let child = self.parse_or_expression()?;
 
+        self.validate_boolean_root(child)?;
+
         self.expect_token(TokenType::EOF)?;
         let end_token = self.current_token_id.unwrap_or(begin_token);
 
@@ -681,7 +683,8 @@ impl Parser {
     fn parse_between_bound(&mut self) -> ParseResult<NodeId> {
         match self.current_token.token_type {
             TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL
-            | TokenType::OCTAL_LITERAL | TokenType::STRING_LITERAL => {
+            | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL
+            | TokenType::STRING_LITERAL => {
                 self.parse_primary_expr()
             }
             TokenType::TRUE | TokenType::FALSE => {
@@ -767,8 +770,8 @@ impl Parser {
         let low_type = self.get_literal_token_type(low_id);
         let high_type = self.get_literal_token_type(high_id);
 
-        let low_is_numeric = matches!(low_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL);
-        let high_is_numeric = matches!(high_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL);
+        let low_is_numeric = matches!(low_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL);
+        let high_is_numeric = matches!(high_type, TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL);
         let low_is_string = low_type == TokenType::STRING_LITERAL;
         let high_is_string = high_type == TokenType::STRING_LITERAL;
 
@@ -809,6 +812,7 @@ impl Parser {
 
     /// Parse a numeric literal image (decimal, hex, or octal) to f64.
     fn parse_numeric_literal(image: &str) -> Result<f64, String> {
+        let image = image.strip_suffix('L').or_else(|| image.strip_suffix('l')).unwrap_or(image);
         if let Some(hex) = image.strip_prefix("0x").or_else(|| image.strip_prefix("0X")) {
             i64::from_str_radix(hex, 16)
                 .map(|i| i as f64)
@@ -826,9 +830,34 @@ impl Parser {
     }
 
     /// Classify current token for IN list element type checking.
-    fn classify_current_token_for_in(&self) -> ParseResult<InElementType> {
+    fn classify_current_token_for_in(&mut self) -> ParseResult<InElementType> {
+        // Handle sign prefix: peek past +/- to classify the numeric literal
+        if matches!(self.current_token.token_type, TokenType::MINUS | TokenType::PLUS) {
+            let next_type = self.lookahead_type(1);
+            return match next_type {
+                Some(TokenType::FLOATING_POINT_LITERAL) => Ok(InElementType::Float),
+                Some(TokenType::DECIMAL_LITERAL) => {
+                    let next_image = self.lookahead(1).map(|t| t.image.clone()).unwrap_or_default();
+                    if next_image.contains('.') {
+                        Ok(InElementType::Float)
+                    } else {
+                        Ok(InElementType::Integer)
+                    }
+                }
+                Some(TokenType::HEX_LITERAL) | Some(TokenType::OCTAL_LITERAL) => Ok(InElementType::Integer),
+                _ => Err(ParseError::at_position(
+                    format!(
+                        "Expected numeric literal after '{}', found {:?}",
+                        self.current_token.image,
+                        next_type
+                    ),
+                    self.current_token.begin_offset,
+                )),
+            };
+        }
         match self.current_token.token_type {
             TokenType::STRING_LITERAL => Ok(InElementType::StringLit),
+            TokenType::FLOATING_POINT_LITERAL => Ok(InElementType::Float),
             TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL => Ok(InElementType::Integer),
             TokenType::DECIMAL_LITERAL => {
                 if self.current_token.image.contains('.') {
@@ -884,12 +913,30 @@ impl Parser {
         }
     }
 
-    /// Parse an IN list element: STRING_LITERAL or numeric literal.
+    /// Parse an IN list element: STRING_LITERAL or numeric literal (optionally signed).
     fn parse_in_element(&mut self) -> ParseResult<NodeId> {
+        // Handle sign prefix for negative/positive numbers in IN lists
+        if matches!(self.current_token.token_type, TokenType::MINUS | TokenType::PLUS) {
+            let begin_token = self.alloc_current_token();
+            let operator = if self.current_token.token_type == TokenType::MINUS {
+                UnaryOp::Negate
+            } else {
+                UnaryOp::Plus
+            };
+            self.consume_token()?;
+            let child = self.parse_primary_expr()?;
+            let end_token = self.current_token_id.unwrap_or(begin_token);
+            let mut node = UnaryExprNode::new(begin_token, end_token);
+            node.children.push(child);
+            node.operator = Some(operator);
+            let node_id = self.arena.alloc_node(AstNode::UnaryExpr(node));
+            self.set_parent(child, node_id);
+            return Ok(node_id);
+        }
         match self.current_token.token_type {
             TokenType::STRING_LITERAL => self.parse_string_literal(),
-            TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL | TokenType::OCTAL_LITERAL => {
-                // Parse as a literal (produces PrimaryExpr -> Literal)
+            TokenType::DECIMAL_LITERAL | TokenType::HEX_LITERAL
+            | TokenType::OCTAL_LITERAL | TokenType::FLOATING_POINT_LITERAL => {
                 self.parse_primary_expr()
             }
             _ => {
@@ -901,6 +948,100 @@ impl Parser {
                     self.current_token.begin_offset,
                 ))
             }
+        }
+    }
+
+    // ========== Boolean Root Validation ==========
+
+    /// Validate that the root expression is boolean-typed (not a standalone literal or arithmetic).
+    fn validate_boolean_root(&self, node_id: NodeId) -> ParseResult<()> {
+        if self.is_boolean_expression(node_id) {
+            Ok(())
+        } else {
+            Err(ParseError::new(
+                "Expression must be boolean (comparison, logical, or boolean literal)".to_string(),
+            ))
+        }
+    }
+
+    /// Check whether a node represents a boolean expression.
+    /// Walks through single-child pass-through nodes to find the "effective" expression.
+    fn is_boolean_expression(&self, node_id: NodeId) -> bool {
+        match self.arena.get_node(node_id) {
+            AstNode::OrExpression(n) => {
+                if n.children.len() > 1 {
+                    return true; // OR with multiple children is boolean
+                }
+                if n.children.len() == 1 {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::AndExpression(n) => {
+                if n.children.len() > 1 {
+                    return true; // AND with multiple children is boolean
+                }
+                if n.children.len() == 1 {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::EqualityExpression(n) => {
+                if !n.operators.is_empty() {
+                    return true; // Has =, <>, IS NULL, IS NOT NULL
+                }
+                if n.children.len() == 1 {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::ComparisonExpression(n) => {
+                if !n.operators.is_empty() {
+                    return true; // Has >, >=, <, <=, LIKE, BETWEEN, IN, etc.
+                }
+                if n.children.len() == 1 {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::AddExpression(n) => {
+                // Arithmetic — not boolean unless single-child pass-through
+                if n.children.len() == 1 && n.operators.is_empty() {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::MultExpr(n) => {
+                if n.children.len() == 1 && n.operators.is_empty() {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::UnaryExpr(n) => {
+                if n.operator == Some(UnaryOp::Not) {
+                    return true; // NOT is boolean
+                }
+                if n.children.len() == 1 && n.operator.is_none() {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false // Unary +/- is arithmetic
+            }
+            AstNode::PrimaryExpr(n) => {
+                if n.children.len() == 1 {
+                    return self.is_boolean_expression(n.children[0]);
+                }
+                false
+            }
+            AstNode::Variable(_) => true, // Variables are assumed boolean when standalone
+            AstNode::Literal(n) => {
+                if n.children.is_empty() {
+                    let token = self.arena.get_token(n.begin_token);
+                    matches!(token.token_type, TokenType::TRUE | TokenType::FALSE)
+                } else {
+                    false // StringLiteral child — not boolean
+                }
+            }
+            _ => false,
         }
     }
 

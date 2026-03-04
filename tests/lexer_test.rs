@@ -254,11 +254,11 @@ fn test_integer_literals() {
 
 #[test]
 fn test_decimal_literals() {
-    assert_tokens("3.14", &[(TokenType::DECIMAL_LITERAL, "3.14")]);
-    assert_tokens("0.5", &[(TokenType::DECIMAL_LITERAL, "0.5")]);
-    assert_tokens("100.0", &[(TokenType::DECIMAL_LITERAL, "100.0")]);
-    assert_tokens("0.0", &[(TokenType::DECIMAL_LITERAL, "0.0")]);
-    assert_tokens("123.456", &[(TokenType::DECIMAL_LITERAL, "123.456")]);
+    assert_tokens("3.14", &[(TokenType::FLOATING_POINT_LITERAL, "3.14")]);
+    assert_tokens("0.5", &[(TokenType::FLOATING_POINT_LITERAL, "0.5")]);
+    assert_tokens("100.0", &[(TokenType::FLOATING_POINT_LITERAL, "100.0")]);
+    assert_tokens("0.0", &[(TokenType::FLOATING_POINT_LITERAL, "0.0")]);
+    assert_tokens("123.456", &[(TokenType::FLOATING_POINT_LITERAL, "123.456")]);
 }
 
 #[test]
@@ -305,12 +305,11 @@ fn test_string_with_special_characters() {
 
 #[test]
 fn test_adjacent_string_literals() {
-    // Two strings back to back: 'ab''cd' -> STRING('ab'), STRING('cd')
+    // Escaped quote: 'ab''cd' -> single STRING('ab''cd')
     assert_tokens(
         "'ab''cd'",
         &[
-            (TokenType::STRING_LITERAL, "'ab'"),
-            (TokenType::STRING_LITERAL, "'cd'"),
+            (TokenType::STRING_LITERAL, "'ab''cd'"),
         ],
     );
 }
@@ -772,10 +771,10 @@ fn test_error_unexpected_character_tilde() {
 }
 
 #[test]
-fn test_error_unexpected_character_dollar() {
-    let err = tokenize_err("$");
-    println!("Error for '$': {}", err);
-    assert!(err.message.contains("Unexpected character"));
+fn test_dollar_sign_identifier() {
+    assert_tokens("$", &[(TokenType::ID, "$")]);
+    assert_tokens("$variable", &[(TokenType::ID, "$variable")]);
+    assert_tokens("$foo123", &[(TokenType::ID, "$foo123")]);
 }
 
 #[test]
@@ -954,7 +953,7 @@ fn test_large_number() {
 
 #[test]
 fn test_decimal_with_many_places() {
-    assert_tokens("3.14159265358979", &[(TokenType::DECIMAL_LITERAL, "3.14159265358979")]);
+    assert_tokens("3.14159265358979", &[(TokenType::FLOATING_POINT_LITERAL, "3.14159265358979")]);
 }
 
 // ========== Comprehensive numeric literal tests ==========
@@ -1004,27 +1003,27 @@ fn test_decimal_adjacent_to_operator() {
 
 #[test]
 fn test_float_leading_zero() {
-    assert_tokens("0.5", &[(TokenType::DECIMAL_LITERAL, "0.5")]);
+    assert_tokens("0.5", &[(TokenType::FLOATING_POINT_LITERAL, "0.5")]);
 }
 
 #[test]
 fn test_float_leading_dot() {
-    assert_tokens(".5", &[(TokenType::DECIMAL_LITERAL, ".5")]);
+    assert_tokens(".5", &[(TokenType::FLOATING_POINT_LITERAL, ".5")]);
 }
 
 #[test]
 fn test_float_leading_dot_multi_digit() {
-    assert_tokens(".123", &[(TokenType::DECIMAL_LITERAL, ".123")]);
+    assert_tokens(".123", &[(TokenType::FLOATING_POINT_LITERAL, ".123")]);
 }
 
 #[test]
 fn test_float_whole_and_fraction() {
-    assert_tokens("99.99", &[(TokenType::DECIMAL_LITERAL, "99.99")]);
+    assert_tokens("99.99", &[(TokenType::FLOATING_POINT_LITERAL, "99.99")]);
 }
 
 #[test]
 fn test_float_zero_dot_zero() {
-    assert_tokens("0.0", &[(TokenType::DECIMAL_LITERAL, "0.0")]);
+    assert_tokens("0.0", &[(TokenType::FLOATING_POINT_LITERAL, "0.0")]);
 }
 
 #[test]
@@ -1032,9 +1031,9 @@ fn test_float_in_expression() {
     assert_tokens(
         "3.14 + .5",
         &[
-            (TokenType::DECIMAL_LITERAL, "3.14"),
+            (TokenType::FLOATING_POINT_LITERAL, "3.14"),
             (TokenType::PLUS, "+"),
-            (TokenType::DECIMAL_LITERAL, ".5"),
+            (TokenType::FLOATING_POINT_LITERAL, ".5"),
         ],
     );
 }
@@ -1045,7 +1044,7 @@ fn test_float_adjacent_to_paren() {
         "(.25)",
         &[
             (TokenType::LPAREN, "("),
-            (TokenType::DECIMAL_LITERAL, ".25"),
+            (TokenType::FLOATING_POINT_LITERAL, ".25"),
             (TokenType::RPAREN, ")"),
         ],
     );
@@ -1230,7 +1229,7 @@ fn test_numeric_types_in_list() {
             (TokenType::COMMA, ","),
             (TokenType::DECIMAL_LITERAL, "3"),
             (TokenType::COMMA, ","),
-            (TokenType::DECIMAL_LITERAL, ".5"),
+            (TokenType::FLOATING_POINT_LITERAL, ".5"),
         ],
     );
 }
@@ -1253,7 +1252,7 @@ fn test_numeric_offsets_octal() {
 fn test_numeric_offsets_leading_dot_float() {
     let tokens = tokenize_with_offsets(".25");
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], (TokenType::DECIMAL_LITERAL, ".25".to_string(), 0, 3));
+    assert_eq!(tokens[0], (TokenType::FLOATING_POINT_LITERAL, ".25".to_string(), 0, 3));
 }
 
 #[test]
@@ -1276,7 +1275,7 @@ fn test_zero_is_decimal_not_octal() {
 #[test]
 fn test_zero_before_dot_is_float() {
     // `0.5` — the `0` is followed by `.`, not an octal digit, so decimal path handles it
-    assert_tokens("0.5", &[(TokenType::DECIMAL_LITERAL, "0.5")]);
+    assert_tokens("0.5", &[(TokenType::FLOATING_POINT_LITERAL, "0.5")]);
 }
 
 #[test]

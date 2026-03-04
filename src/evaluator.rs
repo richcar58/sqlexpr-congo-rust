@@ -532,9 +532,20 @@ impl<'a> Evaluator<'a> {
             TokenType::TRUE => Ok(EvalValue::Bool(true)),
             TokenType::FALSE => Ok(EvalValue::Bool(false)),
             TokenType::NULL => Ok(EvalValue::Null),
+            TokenType::FLOATING_POINT_LITERAL => {
+                let f: f64 = image.parse().map_err(|e: std::num::ParseFloatError| {
+                    EvalError::InvalidLiteral {
+                        literal: image.clone(),
+                        literal_type: "float".to_string(),
+                        error: e.to_string(),
+                    }
+                })?;
+                Ok(EvalValue::Float(f))
+            }
             TokenType::DECIMAL_LITERAL => {
-                if image.contains('.') {
-                    let f: f64 = image.parse().map_err(|e: std::num::ParseFloatError| {
+                let clean = image.strip_suffix('L').or_else(|| image.strip_suffix('l')).unwrap_or(image);
+                if clean.contains('.') {
+                    let f: f64 = clean.parse().map_err(|e: std::num::ParseFloatError| {
                         EvalError::InvalidLiteral {
                             literal: image.clone(),
                             literal_type: "float".to_string(),
@@ -543,7 +554,7 @@ impl<'a> Evaluator<'a> {
                     })?;
                     Ok(EvalValue::Float(f))
                 } else {
-                    let i: i64 = image.parse().map_err(|e: std::num::ParseIntError| {
+                    let i: i64 = clean.parse().map_err(|e: std::num::ParseIntError| {
                         EvalError::InvalidLiteral {
                             literal: image.clone(),
                             literal_type: "integer".to_string(),
@@ -554,9 +565,10 @@ impl<'a> Evaluator<'a> {
                 }
             }
             TokenType::HEX_LITERAL => {
-                let hex_str = image.strip_prefix("0x")
-                    .or_else(|| image.strip_prefix("0X"))
-                    .unwrap_or(image);
+                let clean = image.strip_suffix('L').or_else(|| image.strip_suffix('l')).unwrap_or(image);
+                let hex_str = clean.strip_prefix("0x")
+                    .or_else(|| clean.strip_prefix("0X"))
+                    .unwrap_or(clean);
                 let i = i64::from_str_radix(hex_str, 16).map_err(|e| {
                     EvalError::InvalidLiteral {
                         literal: image.clone(),
@@ -567,7 +579,8 @@ impl<'a> Evaluator<'a> {
                 Ok(EvalValue::Integer(i))
             }
             TokenType::OCTAL_LITERAL => {
-                let oct_str = image.strip_prefix('0').unwrap_or(image);
+                let clean = image.strip_suffix('L').or_else(|| image.strip_suffix('l')).unwrap_or(image);
+                let oct_str = clean.strip_prefix('0').unwrap_or(clean);
                 let i = i64::from_str_radix(oct_str, 8).map_err(|e| {
                     EvalError::InvalidLiteral {
                         literal: image.clone(),

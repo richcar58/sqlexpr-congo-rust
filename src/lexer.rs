@@ -251,7 +251,7 @@ impl Lexer {
         }
 
         // Identifiers and keywords
-        if ch.is_ascii_alphabetic() || ch == '_' {
+        if ch.is_ascii_alphabetic() || ch == '_' || ch == '$' {
             return self.match_identifier_or_keyword(start_pos);
         }
 
@@ -274,6 +274,12 @@ impl Lexer {
         while self.position < self.input.len() {
             let ch = self.current_char();
             if ch == '\'' {
+                // Check for escaped quote ('')
+                if self.peek(1) == Some('\'') {
+                    self.advance(); // consume first '
+                    self.advance(); // consume second '
+                    continue;
+                }
                 self.advance(); // consume closing quote
                 let image = self.input[start_pos..self.position].to_string();
                 return Ok(Some(Token::new(
@@ -309,6 +315,10 @@ impl Lexer {
                 while self.position < self.input.len() && self.current_char().is_ascii_hexdigit() {
                     self.advance();
                 }
+                // Optional long suffix
+                if self.position < self.input.len() && matches!(self.current_char(), 'L' | 'l') {
+                    self.advance();
+                }
                 let image = self.input[start_pos..self.position].to_string();
                 return Ok(Some(Token::new(
                     TokenType::HEX_LITERAL,
@@ -323,6 +333,10 @@ impl Lexer {
                 while self.position < self.input.len() && ('0'..='7').contains(&self.current_char()) {
                     self.advance();
                 }
+                // Optional long suffix
+                if self.position < self.input.len() && matches!(self.current_char(), 'L' | 'l') {
+                    self.advance();
+                }
                 let image = self.input[start_pos..self.position].to_string();
                 return Ok(Some(Token::new(
                     TokenType::OCTAL_LITERAL,
@@ -334,6 +348,7 @@ impl Lexer {
         }
 
         // Consume leading digits
+        let mut is_float = false;
         while self.position < self.input.len() && self.current_char().is_ascii_digit() {
             self.advance();
         }
@@ -341,17 +356,41 @@ impl Lexer {
         if self.position < self.input.len() && self.current_char() == '.'
             && self.peek(1).is_some_and(|ch| ch.is_ascii_digit())
         {
+            is_float = true;
             self.advance(); // consume '.'
             while self.position < self.input.len() && self.current_char().is_ascii_digit() {
                 self.advance();
             }
+        }
+        // Check for exponent (e/E followed by optional +/- and digits)
+        if self.position < self.input.len() && matches!(self.current_char(), 'e' | 'E') {
+            is_float = true;
+            self.advance(); // consume 'e'/'E'
+            if self.position < self.input.len() && matches!(self.current_char(), '+' | '-') {
+                self.advance(); // consume sign
+            }
+            if self.position >= self.input.len() || !self.current_char().is_ascii_digit() {
+                return Err(ParseError::at_position(
+                    "Expected digit in exponent".to_string(),
+                    start_pos,
+                ));
+            }
+            while self.position < self.input.len() && self.current_char().is_ascii_digit() {
+                self.advance();
+            }
+        }
+        if is_float {
             let image = self.input[start_pos..self.position].to_string();
             return Ok(Some(Token::new(
-                TokenType::DECIMAL_LITERAL,
+                TokenType::FLOATING_POINT_LITERAL,
                 image,
                 start_pos,
                 self.position,
             )));
+        }
+        // Optional long suffix for integer literals
+        if self.position < self.input.len() && matches!(self.current_char(), 'L' | 'l') {
+            self.advance();
         }
         let image = self.input[start_pos..self.position].to_string();
         Ok(Some(Token::new(
@@ -367,7 +406,7 @@ impl Lexer {
         // Consume identifier characters
         while self.position < self.input.len() {
             let ch = self.current_char();
-            if ch.is_ascii_alphanumeric() || ch == '_' {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' {
                 self.advance();
             } else {
                 break;
@@ -403,6 +442,38 @@ impl Lexer {
             // Skip whitespace
             if ch.is_whitespace() {
                 self.advance();
+                continue;
+            }
+
+            // Skip line comments: -- to end of line
+            if ch == '-' && self.peek(1) == Some('-') {
+                self.advance(); // consume first -
+                self.advance(); // consume second -
+                while self.position < self.input.len() && self.current_char() != '\n' {
+                    self.advance();
+                }
+                continue;
+            }
+
+            // Skip block comments: /* ... */
+            if ch == '/' && self.peek(1) == Some('*') {
+                let start_pos = self.position;
+                self.advance(); // consume /
+                self.advance(); // consume *
+                loop {
+                    if self.position >= self.input.len() {
+                        return Err(ParseError::at_position(
+                            "Unterminated block comment".to_string(),
+                            start_pos,
+                        ));
+                    }
+                    if self.current_char() == '*' && self.peek(1) == Some('/') {
+                        self.advance(); // consume *
+                        self.advance(); // consume /
+                        break;
+                    }
+                    self.advance();
+                }
                 continue;
             }
 
