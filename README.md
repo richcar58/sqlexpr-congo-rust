@@ -1,8 +1,31 @@
 # sqlexpr-congo-rust
 
-A Rust parser and evaluator for JMS SQL-like selector expressions, generated from a [CongoCC](https://congocc.org) grammar. The parser handles boolean, comparison, and arithmetic expressions with SQL keywords (`AND`, `OR`, `NOT`, `BETWEEN`, `LIKE`, `IN`, `IS NULL`, etc.).
+This project provides a parser and evaluator for boolean expressions written in a SQL-like language. The language leverages SQL's simplicity and wide adoption, and is especially well-suited to represent end-user conditional logic, such as user-defined email routing or message queue selection. No SQL database is required.
+
+The project contains a Rust parser and evaluator for SQL-like selector expressions, generated from a [CongoCC](https://congocc.org) grammar. The parser handles relational, comparison, and arithmetic expressions with SQL keywords (`AND`, `OR`, `NOT`, `BETWEEN`, `LIKE`, `IN`, `IS NULL`, etc.).  The evaluator binds runtime values to variables in boolean expressions and then evaluates those expressions as either true or false. 
 
 Originally derived from an Apache ActiveMQ JMS message selector parser, the Rust code was generated from the CongoCC grammar file `SqlExprParser.ccc` using CongoCC's prototype Rust target support.
+
+## Related Project Catalog
+
+The project is a part of a suite of production-ready and experimental projects that provide SQL-based boolean expression parsers and evaluators that use different technologies in their construction and output.  Below is a summary of these projects.
+
+| <big>**Project Name**</big> | <big>**Description**</big> |
+|:---|:---|
+| >>> **Parsers and Evaluators** <<< | |
+| [sqlexpr-javacc](https://github.com/richcar58/sqlexpr-javacc) | Java parser and evaluator. JavaCC generated parser that incorporates Apache ActiveMQ JMS evaluator. |
+| [sqlexpr-congocc](https://github.com/richcar58/sqlexpr-congocc) | Java parser and evaluator. CongoCC generated parser that incorporates Apache ActiveMQ JMS evaluator. |
+| [sqlexpr-rust](https://github.com/richcar58/sqlexpr-rust) | Rust parser and evaluator generated from EBNF specification by Claude. |
+| [sqlexpr-congo-rust](https://github.com/richcar58/sqlexpr-congo-rust) | Rust parser, evaluator and integration tests generated using the Enhanced CongoCC generator (congo-parser-generator) and Claude. |
+| >>> **Testers** <<< | |
+| [sqlexpr-gen](https://github.com/richcar58/sqlexpr-gen) | Rust test data generator for sqlexpr-* parsers and evaluators. |
+| [sqlexpr-load-congocc](https://github.com/richcar58/sqlexpr-load-congocc) | Java load tester for sqlexpr-congocc. |
+| [sqlexpr-load-rust](https://github.com/richcar58/sqlexpr-load-rust) | Rust load tester for sqlexpr-rust. |
+| sqlexpr-load-congo-rust | Rust load tester for sqlexpr-congo-rust. |
+| [sqlexpr-javacc-test](https://github.com/richcar58/sqlexpr-congocc-test) | Java integration tests for sqlexpr-javacc parser. |
+| [sqlexpr-congocc-test](https://github.com/richcar58/sqlexpr-gen) | Java integration tests for sqlexpr-congocc parser. |
+| >>> **CongoCC Rust Extension** <<< | |
+| [congo-parser-generator](https://github.com/richcar58/congo-parser-generator) | Experimental version of CongoCC enhanced by Claude to output Rust parsers. |
 
 ## Supported Syntax
 
@@ -224,27 +247,29 @@ match err {
 
 ```
 sqlexpr-congo-rust/
-  SqlExprParser.ccc          # CongoCC grammar (source of truth for the language)
-  Cargo.toml                 # Rust package manifest
-  CLAUDE.md                  # Developer guidance for Claude Code
-  src/
-    lib.rs                   # Crate root: module declarations and public re-exports
-    main.rs                  # Example binary
-    tokens.rs                # TokenType enum and Token struct
-    lexer.rs                 # Lexer/tokenizer
-    parser.rs                # Recursive-descent parser
-    arena.rs                 # Arena allocator, AstNode enum, node structs, pretty_print()
-    evaluator.rs             # Expression evaluator
-    visitor.rs               # Depth-first AST visitor
-    error.rs                 # ParseError type
-  tests/
-    lexer_test.rs            # 129 lexer tests
-    parser_test.rs           # 164 parser/AST structure tests
-    parser_test2.rs          # 155 comprehensive parser feature tests
-    parser_type_checking_tests.rs  # 97 BETWEEN/IN type checking tests
-    pretty_parse_test.rs     # 10 pretty-print integration tests
-    evaluator_test.rs        # 130 evaluator tests
-    evaluator_test2.rs       # 191 evaluator tests with variable bindings
+├── SqlExprParser.ccc          # CongoCC grammar (source of truth for the language)
+├── Cargo.toml                 # Rust package manifest
+├── CLAUDE.md                  # Developer guidance for Claude Code
+├── src/
+│   ├── lib.rs                 # Crate root: module declarations and public re-exports
+│   ├── main.rs                # Example binary
+│   ├── tokens.rs              # TokenType enum and Token struct
+│   ├── lexer.rs               # Lexer/tokenizer
+│   ├── parser.rs              # Recursive-descent parser
+│   ├── arena.rs               # Arena allocator, AstNode enum, node structs, pretty_print()
+│   ├── evaluator.rs           # Expression evaluator
+│   ├── visitor.rs             # Depth-first AST visitor
+│   └── error.rs               # ParseError type
+├── tests/
+│   ├── lexer_test.rs          # 129 lexer tests
+│   ├── parser_test.rs         # 164 parser/AST structure tests
+│   ├── parser_test2.rs        # 155 comprehensive parser feature tests
+│   ├── parser_type_checking_tests.rs  # 97 BETWEEN/IN type checking tests
+│   ├── pretty_parse_test.rs   # 10 pretty-print integration tests
+│   ├── evaluator_test.rs      # 130 evaluator tests
+│   └── evaluator_test2.rs     # 191 evaluator tests with variable bindings
+├── LICENSE                    # MIT License
+└── README.md                  # This file
 ```
 
 ## AST Structure
