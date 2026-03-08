@@ -16,7 +16,7 @@ The project is a part of a suite of production-ready and experimental projects t
 | [sqlexpr-javacc](https://github.com/richcar58/sqlexpr-javacc) | Java parser and evaluator. JavaCC generated parser that incorporates Apache ActiveMQ JMS evaluator. |
 | [sqlexpr-congocc](https://github.com/richcar58/sqlexpr-congocc) | Java parser and evaluator. CongoCC generated parser that incorporates Apache ActiveMQ JMS evaluator. |
 | [sqlexpr-rust](https://github.com/richcar58/sqlexpr-rust)[^1] | Rust parser and evaluator generated from EBNF specification by Claude. |
-| [sqlexpr-congo-rust](https://github.com/richcar58/sqlexpr-congo-rust)[^1] | Rust parser, evaluator and tests generated using the Enhanced CongoCC generator (congo-parser-generator) and Claude. |
+| [sqlexpr-congo-rust](https://github.com/richcar58/sqlexpr-congo-rust)[^1] | Rust parser, evaluator and tests generated using the Enhanced CongoCC generator (*congo-parser-generator*) and Claude. |
 | >>> **Testers** <<< | |
 | [sqlexpr-gen](https://github.com/richcar58/sqlexpr-gen) | Rust test data generator for sqlexpr-* parsers and evaluators. |
 | [sqlexpr-load-congocc](https://github.com/richcar58/sqlexpr-load-congocc) | Java load tester for sqlexpr-congocc. |
