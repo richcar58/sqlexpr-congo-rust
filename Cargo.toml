@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 
 # Generated parser metadata
 [package.metadata.congocc]
-grammar_file = "/home/rich/git/sqlexpr-congo-rust/src/../SqlExprParser.ccc"
+grammar_file = "SqlExprParser.ccc"
 generated_by = "CongoCC Parser Generator"
 parser_class = "SqlExprParser"
 lexer_class = "SqlExprParserLexer"
